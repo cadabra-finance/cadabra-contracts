@@ -6,6 +6,7 @@ import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "openzeppelin/utils/Address.sol";
 
 import "./interfaces/IBalancer.sol";
+import "./interfaces/IAdapter.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IRouter.sol";
 import "./helpers/SwapExecutor.sol";
@@ -23,14 +24,18 @@ contract Router is IRouter {
 
     receive() external payable {}
 
-    function investWithSwaps(
+    function invest(
         address adapter,
         address balancer,
         address tokenIn,
         uint256 amountIn,
         uint256 minShareAmount,
-        SwapInfo[] calldata swaps
+        IBalancer.SwapInfo[] calldata swaps,
+        uint32 deadline
     ) external payable override returns (uint sharesAdded) {
+        if (deadline < block.timestamp) {
+            revert Expired(deadline);
+        }
         if (tokenIn == ETH_IDENTIFIER) {
             if (amountIn != msg.value) {
                 revert IncorrectDepositAmount(msg.value, amountIn);
@@ -45,84 +50,57 @@ contract Router is IRouter {
                 amountIn
             );
         }
-        IBalancer.SwapInfo[] memory bSwaps = new IBalancer.SwapInfo[](swaps.length);
-        uint256 transferAmount = 0;
+
+        uint256 totalSwapAmount = 0;
         for (uint i = 0; i < swaps.length; i++) {
-            transferAmount += swaps[i].swapAmount;
-            bSwaps[i] = IBalancer.SwapInfo(swaps[i].swapCallee, swaps[i].swapData, swaps[i].swapAmount, tokenIn);
-        }
-
-        uint restAmount = IERC20(tokenIn).balanceOf(address(this));
-        SafeERC20.safeTransfer(IERC20(tokenIn), adapter, restAmount);
-
-        sharesAdded = IBalancer(balancer).invest(adapter, msg.sender);
-
-        if (sharesAdded < minShareAmount) {
-            revert InsufficientSharesMinted(sharesAdded, minShareAmount);
-        }
-    }
-
-    function investSingleSwap(
-        address adapter,
-        address balancer,
-        address tokenIn,
-        uint256 amountIn,
-        uint256 minShareAmount,
-        SwapInfo calldata swap
-    ) external override payable returns (uint sharesAdded) {
-        if (tokenIn == ETH_IDENTIFIER) {
-            if (amountIn != msg.value) {
-                revert IncorrectDepositAmount(msg.value, amountIn);
+            IBalancer.SwapInfo memory swap = swaps[i];
+            if (swap.token != tokenIn) {
+                revert IncorrectSwapToken(tokenIn, swap.token);
             }
-            IWETH(weth).deposit{value: msg.value}();
-            tokenIn = weth;
-        } else {
-            SafeERC20.safeTransferFrom(IERC20(tokenIn), msg.sender, address(this), amountIn);
+            totalSwapAmount += swap.amount;
         }
 
-        SafeERC20.safeTransfer(IERC20(tokenIn), address(swapExecutor), swap.swapAmount);
-        IBalancer.SwapInfo[] memory bSwaps = new IBalancer.SwapInfo[](1);
-        bSwaps[0] = IBalancer.SwapInfo(swap.swapCallee, swap.swapData, swap.swapAmount, tokenIn);
-        swapExecutor.executeSwaps(bSwaps);
+        if (totalSwapAmount > amountIn) {
+            revert SwapAmountExceedsBalance(amountIn, totalSwapAmount);
+        }
 
-        SafeERC20.safeTransfer(IERC20(tokenIn), adapter, amountIn - swap.swapAmount);
+        SafeERC20.safeTransfer(IERC20(tokenIn), address(swapExecutor), totalSwapAmount);
+        swapExecutor.executeSwaps(swaps);
+
+        SafeERC20.safeTransfer(IERC20(tokenIn), adapter, amountIn - totalSwapAmount);
 
         sharesAdded = IBalancer(balancer).invest(adapter, msg.sender);
 
         if (sharesAdded < minShareAmount) {
             revert InsufficientSharesMinted(sharesAdded, minShareAmount);
-        }    
+        }
     }
 
-    function investTwoSwap(
-        address adapter,
+    function redeem(
         address balancer,
-        address tokenIn,
-        uint256 amountIn,
-        uint256 minShareAmount,
-        SwapInfo calldata firstSwap,
-        SwapInfo calldata secondSwap
-    ) external override payable returns (uint sharesAdded) {
-        if (tokenIn == ETH_IDENTIFIER) {
-            if (amountIn != msg.value) {
-                revert IncorrectDepositAmount(msg.value, amountIn);
-            }            
-            IWETH(weth).deposit{value: msg.value}();
-            tokenIn = weth;
-        } else {
-            SafeERC20.safeTransferFrom(IERC20(tokenIn), msg.sender, address(this), amountIn);
+        uint shares, 
+        IAdapter targetAdapter, 
+        address receiver,
+        TokenAmount[] memory minAmounts
+    ) external override returns (address[] memory tokens, uint[] memory amounts) 
+    {
+        uint256[] memory balancesBefore = new uint256[](minAmounts.length);
+        for (uint i = 0; i < minAmounts.length; i++) {
+            TokenAmount memory ta = minAmounts[i];
+            balancesBefore[i] = IERC20(ta.token).balanceOf(msg.sender);
         }
 
-        SafeERC20.safeTransfer(IERC20(tokenIn), address(swapExecutor), firstSwap.swapAmount + secondSwap.swapAmount);
-        IBalancer.SwapInfo[] memory bSwaps = new IBalancer.SwapInfo[](2);
-        bSwaps[0] = IBalancer.SwapInfo(firstSwap.swapCallee, firstSwap.swapData, firstSwap.swapAmount, tokenIn);
-        bSwaps[1] = IBalancer.SwapInfo(secondSwap.swapCallee, secondSwap.swapData, secondSwap.swapAmount, tokenIn);
-        swapExecutor.executeSwaps(bSwaps);
+        SafeERC20.safeTransferFrom(IERC20(balancer), msg.sender, address(this), shares);
+        (tokens, amounts) = IBalancer(balancer).redeem(shares, targetAdapter, receiver);
 
-        sharesAdded = IBalancer(balancer).invest(adapter, msg.sender);
-
-        if (sharesAdded < minShareAmount) {
-            revert InsufficientSharesMinted(sharesAdded, minShareAmount);
+        for (uint i = 0; i < minAmounts.length; i++) {
+            TokenAmount memory ta = minAmounts[i];
+            uint balanceAfter = IERC20(ta.token).balanceOf(msg.sender);
+            uint diff = balanceAfter - balancesBefore[i];
+            if (diff < ta.amount) {
+                revert InsufficientTokenRedeemed(ta.token, diff, ta.amount);
+            }
         }
     }
+
 }

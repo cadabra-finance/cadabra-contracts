@@ -11,9 +11,6 @@ import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IBalancer.sol";
 import "../helpers/SwapExecutor.sol";
 
-interface _IBalancer {
-    function SWAP_EXECUTOR() external view returns (SwapExecutor);
-}
 
 abstract contract BaseAdapter is IAdapter {
     using SafeERC20 for IERC20;
@@ -28,7 +25,7 @@ abstract contract BaseAdapter is IAdapter {
 
     constructor(address balancer) {
         BALANCER = balancer;
-        SWAP_EXECUTOR = _IBalancer(balancer).SWAP_EXECUTOR();
+        SWAP_EXECUTOR = SwapExecutor(IBalancer(balancer).swapExecutor());
     }
 
     function invest(address dustReceiver)

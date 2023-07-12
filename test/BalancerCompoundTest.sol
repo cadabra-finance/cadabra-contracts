@@ -75,7 +75,7 @@ contract BalancerCompoundTest is Test {
     }
 
     function compound(AdapterMock adapter, uint performanceFee) internal {
-        balancer.compound(address(adapter), performanceFee, new IBalancer.SwapInfo[](0), 0);
+        balancer.compound(address(adapter), performanceFee, new IBalancer.SwapInfo[](0), 0, uint32(block.timestamp));
     }
 
     function addAdapter(AdapterMock adapter_) internal {

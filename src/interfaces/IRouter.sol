@@ -1,43 +1,38 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
+import "./IBalancer.sol";
+
 interface IRouter {
 
-    struct SwapInfo {
-        address swapCallee;
-        bytes swapData;
-        uint256 swapAmount;
+    struct TokenAmount {
+        address token;
+        uint256 amount;
     }
 
     error InsufficientSharesMinted(uint minted, uint minAmount);
+    error InsufficientTokenRedeemed(address token, uint amount, uint minAmount);
+    error SwapAmountExceedsBalance(uint amountIn, uint totalSwapAmount);
     error IncorrectDepositAmount(uint has, uint wants);
+    error IncorrectSwapToken(address tokenIn, address swapToken);
+    error Expired(uint deadline);
 
-    function investWithSwaps(
+    function invest(
         address adapter,
         address balancer,
         address tokenIn,
         uint256 amountIn,
         uint256 minShareAmount,
-        SwapInfo[] calldata swaps
+        IBalancer.SwapInfo[] calldata swaps,
+        uint32 deadline
     ) external payable returns (uint sharesAdded);
 
-    function investSingleSwap(
-        address adapter,
+    function redeem(
         address balancer,
-        address tokenIn,
-        uint256 amountIn,
-        uint256 minShareAmount,
-        SwapInfo calldata swap
-    ) external payable returns (uint sharesAdded);
-
-    function investTwoSwap(
-        address adapter,
-        address balancer,
-        address tokenIn,
-        uint256 amountIn,
-        uint256 minShareAmount,
-        SwapInfo calldata firstSwap,
-        SwapInfo calldata secondSwap
-    ) external payable returns (uint sharesAdded);
+        uint shares, 
+        IAdapter targetAdapter, 
+        address receiver,
+        TokenAmount[] memory minAmounts
+    ) external returns (address[] memory tokens, uint[] memory amounts);
 
 }

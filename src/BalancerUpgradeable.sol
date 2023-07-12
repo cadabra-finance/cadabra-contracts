@@ -36,6 +36,9 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     
     uint32  public constant VALUE_DEGRADATION_DURATION = 7 days;
     uint256 public constant VALUE_DEGRADATION_RATE = VALUE_DEGRADATION_COEFFICIENT / VALUE_DEGRADATION_DURATION; // (0.0000016534*100)% per sec, 100% in 7 days
+
+    uint256 public constant SUPPLY_OFFSET = 1e18;
+    uint256 public constant ASSEST_OFFSET = 1e18;
     
     SwapExecutor public immutable SWAP_EXECUTOR;
     uint256 public immutable DEPOSIT_FEE;
@@ -127,8 +130,8 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
         sharesWithChargedFee = sharesAdded * (PERCENTAGE_COEFFICIENT - DEPOSIT_FEE) / PERCENTAGE_COEFFICIENT;
 
-        _mint(receiver, sharesWithChargedFee);
         emit Invest(targetAdapter, receiver, valuePrior, valueAdded, sharesAdded, sharesWithChargedFee);
+        _mint(receiver, sharesWithChargedFee);
     }
 
     function redeem(uint shares, IAdapter targetAdapter, address receiver)
@@ -145,10 +148,9 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
         (uint tv, AdapterCache memory adapterCache) = _totalValueAndDetails(targetAdapter);
         (uint nav,,) = _totalNAV(tv);
-        uint ts = totalSupply();
 
-        uint redeemValue = shares * nav / ts;
-
+        uint redeemValue = _convertToValue(shares, nav);
+        
         if (redeemValue > adapterCache.value) {
             revert AdapterRedeemExceeds(adapterCache.value, redeemValue);
         }
@@ -157,6 +159,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
             revert EmptyRedeem(shares, redeemValue, address(targetAdapter), adapterCache.value, adapterCache.lpAmount);
         }
 
+        emit Redeem(address(targetAdapter), receiver, shares, tv, redeemValue);
         _burn(msg.sender, shares);
 
         uint lpsToRedeem = adapterCache.lpAmount * redeemValue / adapterCache.value;
@@ -171,11 +174,14 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         }
 
         (tokens, amounts) = targetAdapter.redeem(lpsToRedeem, receiver);
-        emit Redeem(address(targetAdapter), receiver, shares);
     }
 
     function _convertToShares(uint value, uint nav) internal view returns (uint) {
-        return totalSupply() * value / nav;
+        return value * (totalSupply() + SUPPLY_OFFSET) / (nav + ASSEST_OFFSET);
+    }
+
+    function _convertToValue(uint shares, uint nav) internal view returns (uint) {
+        return shares * (nav + ASSEST_OFFSET) / (totalSupply() + SUPPLY_OFFSET);
     }
 
     function _lockedFunds() internal view returns (uint112 lockedProfit, uint112 lockedFee) {        
@@ -256,6 +262,10 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         return $chargedAdapters.values();
     }
 
+    function swapExecutor() external override view returns (address) {
+        return address(SWAP_EXECUTOR);
+    }
+
     //╔═══════════════════════════════════════════ ADMINISTRATIVE FUNCTIONS ═══════════════════════════════════════════╗
 
     function setFeeReceiver(address feeReceiver_) external override onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -318,8 +328,12 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         uint lpAmount,
         SwapInfo[] calldata swaps,
         TransferInfo[] calldata transfers,
-        uint minRebalancedValue
+        uint minRebalancedValue,
+        uint32 deadline
     ) external override onlyRole(REBALANCE_ROLE) nonReentrant {
+        if (deadline < block.timestamp) {
+            revert Expired(deadline);
+        }
         if (!$isActiveAdapter[address(toAdapter)]) {
             revert InvalidAdapter(address(toAdapter));
         }
@@ -348,22 +362,33 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
         (uint vb, uint va) = toAdapter.invest(address(this));
         
-        uint rebalancedValueAfter = va - vb;
-        if (rebalancedValueAfter < rebalancedValueBefore) { 
-            uint diff = rebalancedValueBefore - rebalancedValueAfter;
-            if (diff * PERCENTAGE_COEFFICIENT / rebalancedValueBefore > MAX_REBALANCE_VALUE_LOSS) {
-                revert ValueLost(diff);
+        {
+            uint rebalancedValueAfter = va - vb;
+            if (rebalancedValueAfter < rebalancedValueBefore) { 
+                uint diff = rebalancedValueBefore - rebalancedValueAfter;
+                if (diff * PERCENTAGE_COEFFICIENT / rebalancedValueBefore > MAX_REBALANCE_VALUE_LOSS) {
+                    revert ValueLost(diff);
+                }
             }
-        }
-        if (rebalancedValueAfter < minRebalancedValue) {
-            revert MinRebalanceSlippageExceeds(minRebalancedValue, rebalancedValueAfter);
+            if (rebalancedValueAfter < minRebalancedValue) {
+                revert MinRebalanceSlippageExceeds(minRebalancedValue, rebalancedValueAfter);
+            }
         }
 
         $lastRebalanceTime = uint32(block.timestamp);
         emit Rebalance(address(fromAdapter), address(toAdapter), lpAmount);
     }
         
-    function compound(address adapter, uint performanceFee, SwapInfo[] calldata swaps, uint256 minValue) external override onlyRole(COMPOUND_ROLE) nonReentrant returns (uint addedValue) {
+    function compound(
+        address adapter, 
+        uint performanceFee, 
+        SwapInfo[] calldata swaps, 
+        uint256 minValue,
+        uint32 deadline
+    ) external override onlyRole(COMPOUND_ROLE) nonReentrant returns (uint addedValue) {
+        if (deadline < block.timestamp) {
+            revert Expired(deadline);
+        }
         if (!$adapters.contains(adapter)) {
             revert InvalidAdapter(adapter);
         }

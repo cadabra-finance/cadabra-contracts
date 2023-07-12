@@ -179,19 +179,19 @@ contract BalancerRebalanceTest is Test {
     }
 
     function rebalance(IAdapter fromAdapter, IAdapter toAdapter, uint amount, IBalancer.SwapInfo[] memory swaps, IBalancer.TransferInfo[] memory transfers) internal {
-        balancer.rebalance(fromAdapter, toAdapter, amount, swaps, transfers, 0);
+        balancer.rebalance(fromAdapter, toAdapter, amount, swaps, transfers, 0, uint32(block.timestamp));
     }
 
     function rebalance(IAdapter fromAdapter, IAdapter toAdapter, uint amount, IBalancer.SwapInfo[] memory swaps) internal {
-        balancer.rebalance(fromAdapter, toAdapter, amount, swaps, new IBalancer.TransferInfo[](0), 0);
+        balancer.rebalance(fromAdapter, toAdapter, amount, swaps, new IBalancer.TransferInfo[](0), 0, uint32(block.timestamp));
     }
 
     function rebalance(IAdapter fromAdapter, IAdapter toAdapter, uint amount, IBalancer.TransferInfo[] memory transfers) internal {
-        balancer.rebalance(fromAdapter, toAdapter, amount, new IBalancer.SwapInfo[](0), transfers, 0);
+        balancer.rebalance(fromAdapter, toAdapter, amount, new IBalancer.SwapInfo[](0), transfers, 0, uint32(block.timestamp));
     }
 
     function rebalance(IAdapter fromAdapter, IAdapter toAdapter, uint amount) internal {
-        balancer.rebalance(fromAdapter, toAdapter, amount, new IBalancer.SwapInfo[](0), new IBalancer.TransferInfo[](0), 0);
+        balancer.rebalance(fromAdapter, toAdapter, amount, new IBalancer.SwapInfo[](0), new IBalancer.TransferInfo[](0), 0, uint32(block.timestamp));
     }
 
     function addAdapter(AdapterMock adapter_) internal {

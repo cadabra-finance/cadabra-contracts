@@ -21,7 +21,6 @@ abstract contract ThenaGammaAdapter is BaseAdapter {
     using SafeERC20 for IERC20;
 
     IHypervisor  public immutable HYPERVISOR;
-    IUniProxy    public immutable UNIPROXY;
     IGaugeV2     public immutable GAUGE;
     IERC20       public immutable TOKEN0;
     IERC20       public immutable TOKEN1;
@@ -38,7 +37,6 @@ abstract contract ThenaGammaAdapter is BaseAdapter {
     ) BaseAdapter(_balancer) {
         GAUGE = IGaugeV2(_gauge);
         HYPERVISOR = IHypervisor(GAUGE.TOKEN());
-        UNIPROXY = IUniProxy(HYPERVISOR.whitelistedAddress());
 
         (TOKEN0, TOKEN1) = (HYPERVISOR.token0(), HYPERVISOR.token1());
         REWARD_TOKEN = IERC20(GAUGE.rewardToken());
@@ -74,8 +72,9 @@ abstract contract ThenaGammaAdapter is BaseAdapter {
         }
 
         uint[4] memory minIn;
+        IUniProxy uniProxy = IUniProxy(HYPERVISOR.whitelistedAddress());
         // doesn't really mater what is `to` argument, shares are always issued to msg.sender
-        UNIPROXY.deposit(deposit0, deposit1, address(this), address(HYPERVISOR), minIn);
+        uniProxy.deposit(deposit0, deposit1, address(this), address(HYPERVISOR), minIn);
 
         GAUGE.depositAll();
     }

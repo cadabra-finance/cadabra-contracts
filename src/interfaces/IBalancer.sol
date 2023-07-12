@@ -23,7 +23,7 @@ interface IBalancer {
     }
 
     event Invest(address indexed adapter, address from, uint totalValueBefore, uint valueAdded, uint sharesWithFee, uint sharesMinted);
-    event Redeem(address indexed adapter, address to, uint shares);
+    event Redeem(address indexed adapter, address to, uint shares, uint totalValueBefore, uint valueSubtracted);
     event Rebalance(address indexed fromAdapter, address indexed toAdapter, uint amount);
     event ProfitLocked(uint valueBefore, uint profitLocked, uint feeLocked, uint lockedUntil);
     event AdapterActivityChanged(address adapter, bool active);
@@ -44,6 +44,7 @@ interface IBalancer {
     error InvalidPerformanceFee(uint performanceFee);
     error HugePerformanceFee(uint performanceFee, uint totalValue);
     error InsufficientLiquidityAdded(uint has, uint wants);
+    error Expired(uint deadline);
 
     function invest(address targetAdapter, address receiver) external returns (uint sharesAdded);
     function redeem(uint shares, IAdapter targetAdapter, address receiver)
@@ -56,6 +57,7 @@ interface IBalancer {
     function totalValue() external view returns (uint value);
     function adapters() external view returns (address[] memory);
     function chargedAdapters() external view returns (address[] memory);
+    function swapExecutor() external view returns(address);
 
     //╔═══════════════════════════════════════════ ADMINISTRATIVE FUNCTIONS ═══════════════════════════════════════════╗
     function rebalance(
@@ -64,9 +66,16 @@ interface IBalancer {
         uint amount,
         SwapInfo[] calldata swaps,
         TransferInfo[] calldata transfers,
-        uint minRebalancedValue
+        uint minRebalancedValue,
+        uint32 deadline
     ) external;
-    function compound(address adapter, uint performanceFee, SwapInfo[] calldata swaps, uint256 minValue) external returns (uint addedValue);
+    function compound(
+        address adapter, 
+        uint performanceFee, 
+        SwapInfo[] calldata swaps, 
+        uint256 minValue, 
+        uint32 deadline
+    ) external returns (uint addedValue);
 
     function addAdapter(address adapterAddress) external returns (bool);
     function removeAdapter(address adapterAddress) external returns (bool);
