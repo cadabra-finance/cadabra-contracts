@@ -16,7 +16,9 @@ interface IPool {
 
 library TwapUtils {
     
+    uint256 internal constant Q64 = 1 << 64;
     uint256 internal constant Q96 = 1 << 96;
+    uint256 internal constant Q128 = 1 << 128;
     uint256 internal constant Q192 = 1 << 192;
 
     function getTwap(address uniswapV3Pool, uint32 twapInterval, uint8 decimalsToken0) public view returns(uint256 priceX96) {
@@ -56,16 +58,28 @@ library TwapUtils {
         return convertWithDirectSqrtPrice(10**decimalsToken0, sqrtPriceX96);
     }
 
-    function convertWithDirectSqrtPrice(uint256 amount, uint160 sqrtPriceX96) public pure returns (uint256)
+    function convertWithDirectSqrtPrice(uint256 amount, uint160 sqrtPriceX96) public pure returns (uint256 tokenAmount)
     {
-        uint256 priceX192 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-        return FullMath.mulDiv(amount, priceX192, Q192);
+        if(sqrtPriceX96 <= type(uint128).max){
+            uint256 priceX192 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
+            tokenAmount = FullMath.mulDiv(amount, priceX192, Q192);
+        }
+        else{
+            uint256 priceX128 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, Q64);
+            tokenAmount = FullMath.mulDiv(amount, priceX128, Q128);
+        }
     }
 
-    function convertWithReverseSqrtPrice(uint256 amount, uint160 sqrtPriceX96) public pure returns (uint256)
+    function convertWithReverseSqrtPrice(uint256 amount, uint160 sqrtPriceX96) public pure returns (uint256 tokenAmount)
     {
-        uint256 priceX192 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-        return FullMath.mulDiv(amount, Q192, priceX192);
+        if(sqrtPriceX96 <= type(uint128).max){
+            uint256 priceX192 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
+            tokenAmount = FullMath.mulDiv(amount, Q192, priceX192);
+        }
+        else{
+            uint256 priceX128 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, Q64);
+            tokenAmount = FullMath.mulDiv(amount, Q128, priceX128);
+        }
     }
 
 }
