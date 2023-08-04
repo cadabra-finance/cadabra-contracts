@@ -20,7 +20,7 @@ library ChainLinkLib {
             revert OracleZeroOrNegativePrice(answer);
         }
 
-        uint256 scaleFactor = 18 - feed.decimals();
-        price = uint(answer)*(10**scaleFactor);
+        uint256 d = feed.decimals();
+        price = d <= 18 ? uint(answer)*(10**(18 - d)) : uint(answer)/(10**(d - 18));
     }
 }
