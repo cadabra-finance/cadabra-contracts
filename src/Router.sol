@@ -22,8 +22,6 @@ contract Router is IRouter {
         swapExecutor = SwapExecutor(_swapExecutor);
     }
 
-    receive() external payable {}
-
     function invest(
         address adapter,
         address balancer,
