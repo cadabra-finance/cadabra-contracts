@@ -16,6 +16,7 @@ import "./helpers/SwapExecutor.sol";
 contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
+    bytes32 public constant TIMELOCK_ADMIN_ROLE = keccak256("TIMELOCK_ADMIN_ROLE"); // timelock
     bytes32 public constant ADD_ADAPTER_ROLE = keccak256("ADD_ADAPTER_ROLE"); // timelock
     bytes32 public constant REMOVE_ADAPTER_ROLE = keccak256("REMOVE_ADAPTER_ROLE"); // timelock
     bytes32 public constant ACTIVATE_ADAPTER_ROLE = keccak256("ACTIVATE_ADAPTER_ROLE");
@@ -73,7 +74,13 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         __AccessControl_init();
         __ReentrancyGuard_init();
         $feeReceiver = feeReceiver_;
-        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender()); // must be transferred to MULTISIG after deployment
+        _grantRole(TIMELOCK_ADMIN_ROLE, _msgSender()); // must be transferred to TIMELOCK after deployment
+        
+        _setRoleAdmin(ADD_ADAPTER_ROLE, TIMELOCK_ADMIN_ROLE); 
+        _setRoleAdmin(REMOVE_ADAPTER_ROLE, TIMELOCK_ADMIN_ROLE); 
+        _setRoleAdmin(TAKE_PERFORMANCE_FEE_ROLE, TIMELOCK_ADMIN_ROLE); 
+        _setRoleAdmin(UPGRADE_ROLE, TIMELOCK_ADMIN_ROLE); 
 
         emit FeeReceiverChanged(address(0), feeReceiver_);
     }
