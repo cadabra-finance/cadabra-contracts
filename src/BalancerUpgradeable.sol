@@ -29,7 +29,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     uint256 public constant MAX_REBALANCE_VALUE_LOSS = PERCENTAGE_COEFFICIENT / 100; // 1%
     uint256 public constant MAX_COMPOUND_PERFORMANCE_FEE = PERCENTAGE_COEFFICIENT / 20; // 5%
     uint256 public constant MAX_PROFIT_FACTOR = PERCENTAGE_COEFFICIENT / 100;  // 1%
-    uint32 public constant REBALANCE_COOLDOWN = 6 hours; // 1 hour
+    uint32 public constant REBALANCE_COOLDOWN = 6 hours; // 6 hour
     uint32 public constant TAKE_PROFIT_COOLDOWN = 1 days;
 
     uint256 public constant VALUE_DEGRADATION_COEFFICIENT = 1e18; // 100%

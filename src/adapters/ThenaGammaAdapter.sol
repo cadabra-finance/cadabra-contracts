@@ -73,7 +73,6 @@ abstract contract ThenaGammaAdapter is BaseAdapter {
 
         uint[4] memory minIn;
         IUniProxy uniProxy = IUniProxy(HYPERVISOR.whitelistedAddress());
-        // doesn't really mater what is `to` argument, shares are always issued to msg.sender
         uniProxy.deposit(deposit0, deposit1, address(this), address(HYPERVISOR), minIn);
 
         GAUGE.depositAll();
