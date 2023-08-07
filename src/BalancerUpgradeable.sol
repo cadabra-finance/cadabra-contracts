@@ -409,6 +409,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         }
         uint fee = addedValue * performanceFee / PERCENTAGE_COEFFICIENT;
 
+        emit Compound(adapter, valueBefore, addedValue, fee);
         _lockValue(SafeCastUpgradeable.toUint112(addedValue), SafeCastUpgradeable.toUint112(fee));
     }
 
@@ -427,6 +428,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
         _lockValue(0, feeValue);
 
+        emit TakePerformanceFee(feeValue, tv);
         $lastTakeProfitTime = uint32(block.timestamp);
     }
 

@@ -30,6 +30,8 @@ interface IBalancer {
     event AdapterAdded(address adapter);
     event AdapterRemoved(address adapter);
     event FeeReceiverChanged(address oldFeeReceiver, address newFeeReceiver);
+    event Compound(address adapter, uint totalValueBefore, uint valueAdded, uint fee);
+    event TakePerformanceFee(uint112 feeValue, uint totalValue);
 
     error InsufficientFunds(uint has, uint wants);
     error AdapterRedeemExceeds(uint adapterValue, uint redeemValue);
