@@ -215,11 +215,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
      */
     function _totalNAV(uint value) internal view returns (uint nav, uint112 lockedProfit, uint112 lockedFee) {
         (lockedProfit, lockedFee) = _lockedFunds();
-        if (value - lockedProfit > lockedFee) {
-            nav = value - lockedProfit - lockedFee;
-        } else {
-            nav = 0;
-        }
+        nav = value > lockedProfit + lockedFee ? value - lockedProfit - lockedFee : 0;
     }
     
     function totalNAV() external override view returns (uint nav, uint112 lockedProfit, uint112 lockedFee) {
