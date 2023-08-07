@@ -35,9 +35,6 @@ library TwapUtils {
 
     function getSqrtTwapX96(address uniswapV3Pool, uint32 twapInterval) public view returns (uint160 sqrtPriceX96) {
         if (twapInterval == 0) {
-            uint32[] memory secondsAgos = new uint32[](1);
-            secondsAgos[0] = 0;
-
             (sqrtPriceX96,,,,,,) = IPool(uniswapV3Pool).globalState();
         } else {
             uint32[] memory secondsAgos = new uint32[](2);
