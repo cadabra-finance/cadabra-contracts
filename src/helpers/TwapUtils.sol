@@ -47,9 +47,17 @@ library TwapUtils {
             (int56[] memory tickCumulatives,,, ) = IPool(uniswapV3Pool).getTimepoints(secondsAgos);
 
             // tick(imprecise as it's an integer) to price
-            sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
-                int24((tickCumulatives[1] - tickCumulatives[0]) / SafeCast.toInt56(int256(uint256(twapInterval))))
-            );
+            int56 t = SafeCast.toInt56(int256(uint256(twapInterval)));
+            if(tickCumulatives[1] - tickCumulatives[0] > 0){
+                sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
+                    int24((tickCumulatives[1] - tickCumulatives[0]) / t)
+                );
+            }
+            else{
+                sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
+                    int24((tickCumulatives[1] - tickCumulatives[0] - t + 1) / t)
+                );                            
+            }
         }
     }
 
