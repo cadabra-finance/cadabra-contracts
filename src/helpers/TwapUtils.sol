@@ -46,7 +46,7 @@ library TwapUtils {
 
             // tick(imprecise as it's an integer) to price
             sqrtPriceX96 = TickMath.getSqrtRatioAtTick(
-                int24((tickCumulatives[1] - tickCumulatives[0]) / SafeCast.toInt56(SafeCast.toInt256(uint256(twapInterval))))
+                int24((tickCumulatives[1] - tickCumulatives[0]) / SafeCast.toInt56(int256(uint256(twapInterval))))
             );
         }
     }
