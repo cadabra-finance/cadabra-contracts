@@ -69,7 +69,7 @@ contract BalancerAccessTest is Test {
     }
 
     function test_GrantRoleAsSecondAdmin() external {
-        balancer.grantRole(balancer.DEFAULT_ADMIN_ROLE(), admin2);
+        balancer.grantRole(balancer.TIMELOCK_ADMIN_ROLE(), admin2);
         vm.startPrank(admin2);
         balancer.grantRole(balancer.ADD_ADAPTER_ROLE(), u1);
         vm.stopPrank();
@@ -83,9 +83,9 @@ contract BalancerAccessTest is Test {
     }
 
     function testFail_GrantRoleAsRenouncedAdmin() external {
-        balancer.grantRole(balancer.DEFAULT_ADMIN_ROLE(), admin2);
+        balancer.grantRole(balancer.TIMELOCK_ADMIN_ROLE(), admin2);
         vm.startPrank(admin2);
-        balancer.renounceRole(balancer.DEFAULT_ADMIN_ROLE(), admin2);
+        balancer.renounceRole(balancer.TIMELOCK_ADMIN_ROLE(), admin2);
         balancer.grantRole(balancer.ADD_ADAPTER_ROLE(), u1);
         vm.stopPrank();
     }
@@ -98,9 +98,9 @@ contract BalancerAccessTest is Test {
     }
 
     function testFail_GrantRoleAsRevokedAdmin() external {
-        balancer.grantRole(balancer.DEFAULT_ADMIN_ROLE(), admin2);
+        balancer.grantRole(balancer.TIMELOCK_ADMIN_ROLE(), admin2);
         vm.startPrank(admin2);
-        balancer.revokeRole(balancer.DEFAULT_ADMIN_ROLE(), address(this));
+        balancer.revokeRole(balancer.TIMELOCK_ADMIN_ROLE(), address(this));
         vm.stopPrank();
         balancer.grantRole(balancer.ADD_ADAPTER_ROLE(), u1);
     }

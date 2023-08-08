@@ -38,8 +38,6 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     uint32  public constant VALUE_DEGRADATION_DURATION = 7 days;
     uint256 public constant VALUE_DEGRADATION_RATE = VALUE_DEGRADATION_COEFFICIENT / VALUE_DEGRADATION_DURATION; // (0.0000016534*100)% per sec, 100% in 7 days
 
-    uint256 public constant SUPPLY_OFFSET = 1e18;
-    uint256 public constant ASSEST_OFFSET = 1e18;
     
     SwapExecutor public immutable SWAP_EXECUTOR;
     uint256 public immutable DEPOSIT_FEE;
@@ -126,9 +124,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
 
         // shouldn't be susceptible to inflation attacks, since `valuePrior` can only increase through adding shares (???)
-        uint sharesAdded = nav == 0
-            ? valueAdded
-            : _convertToShares(valueAdded, nav);
+        uint sharesAdded = _convertToShares(valueAdded, nav);
 
         // still, some protection isn't going to hurt
         if (sharesAdded == 0) {
@@ -184,11 +180,18 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     }
 
     function _convertToShares(uint value, uint nav) internal view returns (uint) {
-        return value * (totalSupply() + SUPPLY_OFFSET) / (nav + ASSEST_OFFSET);
+        if (nav == 0) {
+            return value;
+        }
+        uint totalSupply = totalSupply();
+        if (totalSupply == 0) {
+            return value;
+        }
+        return value * totalSupply / nav;
     }
 
     function _convertToValue(uint shares, uint nav) internal view returns (uint) {
-        return shares * (nav + ASSEST_OFFSET) / (totalSupply() + SUPPLY_OFFSET);
+        return shares * nav / totalSupply();
     }
 
     function _lockedFunds() internal view returns (uint112 lockedProfit, uint112 lockedFee) {        
