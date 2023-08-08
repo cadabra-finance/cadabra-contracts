@@ -66,6 +66,21 @@ abstract contract BaseAdapter is IAdapter {
         (valueBefore, valueAfter) = _investInternal(address(BALANCER));
     }
 
+    function recoverFunds(IBalancer.TransferInfo calldata transfer, address to) 
+        external 
+        virtual 
+        override 
+        onlyBalancer
+    {
+        address[] memory tokens = utilizedTokens();
+        for (uint i = 0; i < tokens.length; i++) {
+            if (tokens[i] == transfer.token) {
+                revert UnsupportedToken(transfer.token);
+            }
+        }
+        IERC20(transfer.token).safeTransfer(to, transfer.amount);
+    }
+
     function _investInternal(address dustReceiver) internal returns (uint256 valueBefore, uint256 valueAfter) {
         (valueBefore,) = value();
         _invest();
@@ -93,9 +108,8 @@ abstract contract BaseAdapter is IAdapter {
         virtual
         returns (address[] memory tokens, uint[] memory amounts);
     function _claimAll() internal virtual;
-
+    function utilizedTokens() public virtual returns(address[] memory tokens);
     function depositTokens() public virtual view returns (address[] memory tokens);
-
     function value() public view virtual returns (uint estimatedValue, uint lpAmount);
     function pendingRewards() external view virtual returns(address[] memory tokens, uint[] memory amounts);
     function ratios() external view virtual returns(address[] memory tokens, uint[] memory ratio);

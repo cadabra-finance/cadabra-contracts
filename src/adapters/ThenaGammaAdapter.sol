@@ -116,6 +116,14 @@ abstract contract ThenaGammaAdapter is BaseAdapter {
         estimatedValue = (value0 + value1) * lps / ts / PRICE_DECIMALS;
     }
 
+    function utilizedTokens() public virtual override returns(address[] memory tokens) {
+        tokens = new address[](3);
+        tokens[0] = address(TOKEN0);
+        tokens[1] = address(TOKEN1);
+        tokens[2] = address(REWARD_TOKEN);
+        tokens[3] = address(GAUGE);
+    }
+
     function depositTokens() public override view returns (address[] memory tokens) {
         tokens = new address[](2);
         tokens[0] = address(TOKEN0);

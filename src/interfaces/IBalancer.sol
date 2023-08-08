@@ -85,5 +85,6 @@ interface IBalancer {
     function deactivateAdapter(address adapterAddress) external;
     function setFeeReceiver(address feeReceiver_) external;
     function takePerformanceFee(uint112 feeValue) external;
+    function recoverFunds(address adapter, TransferInfo calldata transfer, address to) external;   
 
 }

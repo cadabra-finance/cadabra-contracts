@@ -122,4 +122,7 @@ contract AdapterMock is BaseAdapter, StdAssertions {
     function _invest() internal virtual override {}
 
     function _redeem(uint256 lpAmount, address to) internal virtual override returns (address[] memory, uint[] memory) {}
+
+    function utilizedTokens() public virtual override returns(address[] memory tokens) {}
+
 }

@@ -16,6 +16,8 @@ interface IAdapter {
             uint[] memory amounts
         );
     function compound(IBalancer.SwapInfo[] calldata swaps) external returns (uint leqBefore,uint leqAfter);
+    function recoverFunds(IBalancer.TransferInfo calldata transfer, address to) external;
+    function utilizedTokens() external returns(address[] memory tokens);
     function pendingRewards() external view returns(address[] memory tokens, uint[] memory amounts);
     function value()  external view returns (uint estimatedValue, uint lpAmount);
     function ratios() external view returns(address[] memory tokens, uint[] memory ratio);

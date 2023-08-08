@@ -25,6 +25,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     bytes32 public constant COMPOUND_ROLE = keccak256("COMPOUND_ROLE");
     bytes32 public constant TAKE_PERFORMANCE_FEE_ROLE = keccak256("TAKE_PERFORMANCE_FEE_ROLE"); // timelock
     bytes32 public constant UPGRADE_ROLE = keccak256("UPGRADE_ROLE"); // timelock
+    bytes32 public constant RECOVER_FUNDS_ROLE = keccak256("RECOVER_FUNDS_ROLE");
 
     uint256 public constant PERCENTAGE_COEFFICIENT = 1e6; // 100%
     uint256 public constant MAX_REBALANCE_VALUE_LOSS = PERCENTAGE_COEFFICIENT / 100; // 1%
@@ -430,6 +431,19 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
         emit TakePerformanceFee(feeValue, tv);
         $lastTakeProfitTime = uint32(block.timestamp);
+    }
+
+    function recoverFunds(
+        address adapter, 
+        TransferInfo calldata transfer, 
+        address to
+    )   
+        external 
+        virtual 
+        override 
+        onlyRole(RECOVER_FUNDS_ROLE)
+    {
+        IAdapter(adapter).recoverFunds(transfer, to);
     }
 
     function _lockValue(uint112 profitToLock, uint112 feeToLock) internal {
