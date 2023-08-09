@@ -37,7 +37,7 @@ contract ThenaGammaToken0TWAPAdapter is ThenaGammaAdapter {
     }
 
     function token1Price() public virtual view override returns (uint256) {
-        return TOKEN1_PRICE_FEED.getPrice(FEED_STALE_PRICE_INTERVAL);
+        return TOKEN1_PRICE_FEED.getL1Price(FEED_STALE_PRICE_INTERVAL);
     }
 
 }

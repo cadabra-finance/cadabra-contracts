@@ -8,7 +8,7 @@ library ChainLinkLib {
     error OracleStalePrice(uint answeredAt);
     error OracleZeroOrNegativePrice(int price);
 
-    function getPrice(AggregatorV3Interface feed, uint stalePriceInterval) internal view returns (uint256 price) {
+    function getL1Price(AggregatorV3Interface feed, uint stalePriceInterval) internal view returns (uint256 price) {
         // TODO: L2 https://twitter.com/bytes032/status/1653943092427325448
         // https://docs.chain.link/data-feeds/l2-sequencer-feeds
         
