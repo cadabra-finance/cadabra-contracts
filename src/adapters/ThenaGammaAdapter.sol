@@ -117,7 +117,7 @@ abstract contract ThenaGammaAdapter is BaseAdapter {
     }
 
     function utilizedTokens() public virtual override returns(address[] memory tokens) {
-        tokens = new address[](3);
+        tokens = new address[](4); 
         tokens[0] = address(TOKEN0);
         tokens[1] = address(TOKEN1);
         tokens[2] = address(REWARD_TOKEN);
