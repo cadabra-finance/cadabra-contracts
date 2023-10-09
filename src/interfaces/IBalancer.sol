@@ -25,13 +25,17 @@ interface IBalancer {
     event Invest(address indexed adapter, address from, uint totalValueBefore, uint valueAdded, uint sharesWithFee, uint sharesMinted);
     event Redeem(address indexed adapter, address to, uint shares, uint totalValueBefore, uint valueSubtracted);
     event Rebalance(address indexed fromAdapter, address indexed toAdapter, uint amount);
-    event ProfitLocked(uint valueBefore, uint profitLocked, uint feeLocked, uint lockedUntil);
+    event FeeLocked(uint valueBefore, uint feeLocked, uint lockedUntil);
     event AdapterActivityChanged(address adapter, bool active);
     event AdapterAdded(address adapter);
     event AdapterRemoved(address adapter);
     event FeeReceiverChanged(address oldFeeReceiver, address newFeeReceiver);
-    event Compound(address adapter, uint totalValueBefore, uint valueAdded, uint fee);
+    event Compound(address adapter, uint totalValueBefore, uint valueAdded, uint tokensBought, uint fee);
+    event RewardLocked(uint256 reward, uint lockedUntil);
     event TakePerformanceFee(uint112 feeValue, uint totalValue);
+    event Harvest(address indexed user, uint256 reward);
+    event SwapPoolAddressAdded(address);
+    event SwapPoolAddressRemoved(address);
 
     error InsufficientFunds(uint has, uint wants);
     error AdapterRedeemExceeds(uint adapterValue, uint redeemValue);
@@ -47,6 +51,8 @@ interface IBalancer {
     error HugePerformanceFee(uint performanceFee, uint totalValue);
     error InsufficientLiquidityAdded(uint has, uint wants);
     error Expired(uint deadline);
+    error UpgradeAdaptersDontMatch(address sourceAdapter, address targetAdatper);
+    error ArrayIndexOutOfBounds();
 
     function invest(address targetAdapter, address receiver) external returns (uint sharesAdded);
     function redeem(uint shares, IAdapter targetAdapter, address receiver)
@@ -55,7 +61,7 @@ interface IBalancer {
             address[] memory tokens,
             uint[] memory amounts
         );
-    function totalNAV() external view returns (uint nav, uint112 lockedProfit, uint112 lockedFee);
+    function totalNAV() external view returns (uint nav, uint112 lockedFee);
     function totalValue() external view returns (uint value);
     function adapters() external view returns (address[] memory);
     function chargedAdapters() external view returns (address[] memory);
@@ -74,17 +80,26 @@ interface IBalancer {
     function compound(
         address adapter, 
         uint performanceFee, 
-        SwapInfo[] calldata swaps, 
-        uint256 minValue, 
+        SwapInfo[] calldata swaps,
+        uint256 minTokensBought, 
         uint32 deadline
-    ) external returns (uint addedValue);
+    ) external returns (uint tokensBought);
 
     function addAdapter(address adapterAddress) external returns (bool);
     function removeAdapter(address adapterAddress) external returns (bool);
     function activateAdapter(address adapterAddress) external returns (bool);
     function deactivateAdapter(address adapterAddress) external;
+    function upgradeAdapter(IAdapter sourceAdapter, IAdapter targetAdapter, uint32 deadline)  external;
     function setFeeReceiver(address feeReceiver_) external;
-    function takePerformanceFee(uint112 feeValue) external;
-    function recoverFunds(address adapter, TransferInfo calldata transfer, address to) external;   
+    function takePerformanceFee(uint112 feeValue, uint256 minTokensBought) external;
+    function recoverFunds(address adapter, TransferInfo calldata transfer, address to) external;
+    function addSwapPoolAddress(address swapPool) external;
+    function removeSwapPoolAddress(uint index) external;
 
+    //╔═══════════════════════════════════════════ GAUGE FUNCTIONS ═══════════════════════════════════════════╗
+    function lastTimeRewardApplicable() external view returns (uint256);
+    function rewardPerToken() external view returns (uint256);
+    function earned(address account) external view returns (uint256);
+    function getReward() external;
+    function getSwapPoolsReward() external returns (uint reward);
 }

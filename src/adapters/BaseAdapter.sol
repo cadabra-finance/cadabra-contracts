@@ -72,13 +72,27 @@ abstract contract BaseAdapter is IAdapter {
         override 
         onlyBalancer
     {
-        address[] memory tokens = utilizedTokens();
+        address[] memory tokens = negotiableTokens();
         for (uint i = 0; i < tokens.length; i++) {
             if (tokens[i] == transfer.token) {
                 revert UnsupportedToken(transfer.token);
             }
         }
         IERC20(transfer.token).safeTransfer(to, transfer.amount);
+    }
+
+    /// @notice Execute calls by the adapter to reallocate funds to other adapter if external api used in the adapter is changed
+    /// @dev Calls must be executed by timelock
+    function emergencyCall(CallInfo[] calldata calls)
+        external
+        virtual
+        override
+        onlyBalancer
+    {
+        for (uint i = 0; i < calls.length; i++) {
+            CallInfo calldata call = calls[i];
+            Address.functionCall(call.callee, call.data);
+        }
     }
 
     function _investInternal(address dustReceiver) internal returns (uint256 valueBefore, uint256 valueAfter) {
@@ -108,7 +122,7 @@ abstract contract BaseAdapter is IAdapter {
         virtual
         returns (address[] memory tokens, uint[] memory amounts);
     function _claimAll() internal virtual;
-    function utilizedTokens() public virtual returns(address[] memory tokens);
+    function negotiableTokens() public virtual returns(address[] memory tokens);
     function depositTokens() public virtual view returns (address[] memory tokens);
     function value() public view virtual returns (uint estimatedValue, uint lpAmount);
     function pendingRewards() external view virtual returns(address[] memory tokens, uint[] memory amounts);

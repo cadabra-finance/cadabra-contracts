@@ -79,15 +79,19 @@ contract Router is IRouter {
         uint shares, 
         IAdapter targetAdapter, 
         address receiver,
-        TokenAmount[] memory minAmounts
+        TokenAmount[] memory minAmounts,
+        uint32 deadline
     ) external override returns (address[] memory tokens, uint[] memory amounts) 
     {
+        if (deadline < block.timestamp) {
+            revert Expired(deadline);
+        }
         uint256[] memory balancesBefore = new uint256[](minAmounts.length);
         for (uint i = 0; i < minAmounts.length; i++) {
             TokenAmount memory ta = minAmounts[i];
             balancesBefore[i] = IERC20(ta.token).balanceOf(msg.sender);
         }
-
+        
         SafeERC20.safeTransferFrom(IERC20(balancer), msg.sender, address(this), shares);
         (tokens, amounts) = IBalancer(balancer).redeem(shares, targetAdapter, receiver);
 

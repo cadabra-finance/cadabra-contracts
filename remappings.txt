@@ -4,3 +4,8 @@ openzeppelin/=lib/openzeppelin-contracts/contracts
 openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts
 uniswap-v3-core/=lib/v3-core
 chainlink/=lib/chainlink
+prb-math/=lib/prb-math/src
+
+@layerzerolabs/solidity-examples=lib/solidity-examples/contracts
+@openzeppelin/contracts-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts

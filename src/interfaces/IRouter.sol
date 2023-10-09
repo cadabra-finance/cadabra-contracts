@@ -32,7 +32,8 @@ interface IRouter {
         uint shares, 
         IAdapter targetAdapter, 
         address receiver,
-        TokenAmount[] memory minAmounts
+        TokenAmount[] memory minAmounts,
+        uint32 deadline
     ) external returns (address[] memory tokens, uint[] memory amounts);
 
 }
