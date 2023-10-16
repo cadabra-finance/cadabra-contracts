@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Unlicensed
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "openzeppelin/token/ERC20/extensions/IERC20Metadata.sol";
@@ -64,6 +64,7 @@ library VelodromeUtils {
         }
     }
 
+    /// @dev copied from https://github.com/ThenafiBNB/THENA-Contracts/blob/f5bc742e1ff16c8be308a271a6a4a0e8f9e06453/contracts/Pair.sol#L283-L291
     function reserves(address _pool) public view returns (uint256 _reserve0, uint256 _reserve1) {
         IPool pool = IPool(_pool);
         IPool.Observation memory _observation = pool.lastObservation();

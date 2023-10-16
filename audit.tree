@@ -7,13 +7,10 @@ src
 │   ├── VelodromePoolAdapter.sol
 │   └── VelodromePoolAdapter_qStablePair.sol
 ├── helpers
-│   ├── StableUtils.sol
-│   ├── SwapExecutor.sol
-│   └── VelodromeUtils.sol
+│   └── SwapExecutor.sol
 ├── libraries
-│   └── ChainLinkLibrary.sol
+│   └── VelodromeUtils.sol
 └── token
-    ├── Abra.sol
     ├── AbraVesting.sol
     ├── RewardsDistributor.sol
     └── RewardsSource.sol
