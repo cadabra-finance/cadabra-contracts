@@ -15,37 +15,38 @@ import "./interfaces/IAdapter.sol";
 import "./interfaces/IBalancer.sol";
 import "./helpers/SwapExecutor.sol";
 
+
+bytes32 constant TIMELOCK_ADMIN_ROLE = keccak256("TIMELOCK_ADMIN_ROLE"); // timelock
+bytes32 constant ADD_ADAPTER_ROLE = keccak256("ADD_ADAPTER_ROLE"); // timelock
+bytes32 constant REMOVE_ADAPTER_ROLE = keccak256("REMOVE_ADAPTER_ROLE"); // timelock
+bytes32 constant ACTIVATE_ADAPTER_ROLE = keccak256("ACTIVATE_ADAPTER_ROLE");
+bytes32 constant DEACTIVATE_ADAPTER_ROLE = keccak256("DEACTIVATE_ADAPTER_ROLE");
+bytes32 constant REBALANCE_ROLE = keccak256("REBALANCE_ROLE");
+bytes32 constant COMPOUND_ROLE = keccak256("COMPOUND_ROLE");
+bytes32 constant TAKE_PERFORMANCE_FEE_ROLE = keccak256("TAKE_PERFORMANCE_FEE_ROLE"); // timelock
+bytes32 constant UPGRADE_ROLE = keccak256("UPGRADE_ROLE"); // timelock
+bytes32 constant RECOVER_FUNDS_ROLE = keccak256("RECOVER_FUNDS_ROLE");
+bytes32 constant SWAP_POOL_ADDRESSES_ADMIN_ROLE = keccak256("SWAP_POOL_ADDRESSES_ADMIN_ROLE"); // timelock
+
 contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
     using SafeERC20 for IERC20;
-
-    bytes32 public constant TIMELOCK_ADMIN_ROLE = keccak256("TIMELOCK_ADMIN_ROLE"); // timelock
-    bytes32 public constant ADD_ADAPTER_ROLE = keccak256("ADD_ADAPTER_ROLE"); // timelock
-    bytes32 public constant REMOVE_ADAPTER_ROLE = keccak256("REMOVE_ADAPTER_ROLE"); // timelock
-    bytes32 public constant ACTIVATE_ADAPTER_ROLE = keccak256("ACTIVATE_ADAPTER_ROLE");
-    bytes32 public constant DEACTIVATE_ADAPTER_ROLE = keccak256("DEACTIVATE_ADAPTER_ROLE");
-    bytes32 public constant REBALANCE_ROLE = keccak256("REBALANCE_ROLE");
-    bytes32 public constant COMPOUND_ROLE = keccak256("COMPOUND_ROLE");
-    bytes32 public constant TAKE_PERFORMANCE_FEE_ROLE = keccak256("TAKE_PERFORMANCE_FEE_ROLE"); // timelock
-    bytes32 public constant UPGRADE_ROLE = keccak256("UPGRADE_ROLE"); // timelock
-    bytes32 public constant RECOVER_FUNDS_ROLE = keccak256("RECOVER_FUNDS_ROLE");
-    bytes32 public constant SWAP_POOL_ADDRESSES_ADMIN_ROLE = keccak256("SWAP_POOL_ADDRESSES_ADMIN_ROLE"); // timelock
 
     uint256 public constant PERCENTAGE_COEFFICIENT = 1e6; // 100%
     uint256 public constant MAX_REBALANCE_VALUE_LOSS = PERCENTAGE_COEFFICIENT / 100; // 1%
     uint256 public constant MAX_UPGRADE_ADAPTER_VALUE_LOSS = PERCENTAGE_COEFFICIENT / 100000; // 0.001%
     uint256 public constant MAX_COMPOUND_PERFORMANCE_FEE = PERCENTAGE_COEFFICIENT / 20; // 5%
     uint256 public constant MAX_PROFIT_FACTOR = PERCENTAGE_COEFFICIENT / 100;  // 1%
-    uint32 public constant REBALANCE_COOLDOWN = 6 hours; // 6 hour
-    uint32 public constant TAKE_PROFIT_COOLDOWN = 1 days;
+    uint256 public constant REBALANCE_COOLDOWN = 6 hours; // 6 hour
+    uint256 public constant TAKE_PROFIT_COOLDOWN = 1 days;
 
     uint256 public constant VALUE_DEGRADATION_COEFFICIENT = 1e18; // 100%
     
-    uint32  public constant VALUE_DEGRADATION_DURATION = 7 days;
+    uint256 public constant VALUE_DEGRADATION_DURATION = 7 days;
     uint256 public constant VALUE_DEGRADATION_RATE = VALUE_DEGRADATION_COEFFICIENT / VALUE_DEGRADATION_DURATION; // (0.0000016534*100)% per sec, 100% in 7 days
 
     
-    SwapExecutor public immutable SWAP_EXECUTOR;
+    SwapExecutor private immutable SWAP_EXECUTOR;
     uint256 public immutable DEPOSIT_FEE;
     IERC20 public immutable ABRA;
     EnumerableSetUpgradeable.AddressSet private $adapters;
@@ -65,13 +66,13 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     uint32  public $lastTakeProfitTime;
     address public $feeReceiver;
 
-    uint32 public rewardPeriodFinish;
-    uint32 public rewardLastUpdateTime;
-    uint256 public rewardRate;
-    uint256 public rewardPerTokenStored;
-    mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewards;
-    address[] public swapPoolAddresses;
+    uint32  public $rewardPeriodFinish;
+    uint32  public $rewardLastUpdateTime;
+    uint256 public $rewardRate;
+    uint256 public $rewardPerTokenStored;
+    mapping(address => uint256) public $userRewardPerTokenPaid;
+    mapping(address => uint256) public $rewards;
+    address[] public $swapPoolAddresses;
 
     constructor(address _abra, address _swapExecutor, uint256 _depositFee) {
         ABRA = IERC20(_abra);
@@ -87,13 +88,15 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         __AccessControl_init();
         __ReentrancyGuard_init();
         $feeReceiver = feeReceiver_;
+        // codesize optimization
+        bytes32 _TIMELOCK_ADMIN_ROLE = TIMELOCK_ADMIN_ROLE;
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender()); // must be transferred to MULTISIG after deployment
-        _grantRole(TIMELOCK_ADMIN_ROLE, _msgSender()); // must be transferred to TIMELOCK after deployment
+        _grantRole(_TIMELOCK_ADMIN_ROLE, _msgSender()); // must be transferred to TIMELOCK after deployment
         
-        _setRoleAdmin(ADD_ADAPTER_ROLE, TIMELOCK_ADMIN_ROLE); 
-        _setRoleAdmin(REMOVE_ADAPTER_ROLE, TIMELOCK_ADMIN_ROLE); 
-        _setRoleAdmin(TAKE_PERFORMANCE_FEE_ROLE, TIMELOCK_ADMIN_ROLE); 
-        _setRoleAdmin(UPGRADE_ROLE, TIMELOCK_ADMIN_ROLE); 
+        _setRoleAdmin(ADD_ADAPTER_ROLE, _TIMELOCK_ADMIN_ROLE); 
+        _setRoleAdmin(REMOVE_ADAPTER_ROLE, _TIMELOCK_ADMIN_ROLE); 
+        _setRoleAdmin(TAKE_PERFORMANCE_FEE_ROLE, _TIMELOCK_ADMIN_ROLE); 
+        _setRoleAdmin(UPGRADE_ROLE, _TIMELOCK_ADMIN_ROLE); 
 
         emit FeeReceiverChanged(address(0), feeReceiver_);
     }
@@ -493,10 +496,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         (uint sharesToMint, uint valuePrior, uint valueAdded) = _processCompound(adapter, swaps);
         _mint(address(this), sharesToMint);
 
-        tokensBought = _performSwap(sharesToMint);
-        if (minTokensBought > tokensBought) {
-            revert InsufficientLiquidityAdded(tokensBought, minTokensBought);
-        }
+        tokensBought = _performSwap(sharesToMint, minTokensBought, deadline);
 
         uint fee = tokensBought * performanceFee / PERCENTAGE_COEFFICIENT;
         ABRA.safeTransfer($feeReceiver, fee);
@@ -505,7 +505,16 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         _lockToken(tokensBought - fee);
     }
 
-    function takePerformanceFee(uint112 feeValue, uint256 minTokensBought) external override onlyRole(TAKE_PERFORMANCE_FEE_ROLE) nonReentrant {
+    function takePerformanceFee(
+        uint112 feeValue,
+        uint256 minTokensBought,
+        uint32 deadline
+    ) 
+        external 
+        override 
+        onlyRole(TAKE_PERFORMANCE_FEE_ROLE) 
+        nonReentrant 
+    {
         if ($lastTakeProfitTime + TAKE_PROFIT_COOLDOWN > block.timestamp) {
             revert Cooldown($lastTakeProfitTime + TAKE_PROFIT_COOLDOWN);
         }
@@ -518,7 +527,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
             revert HugePerformanceFee(feeValue, tv);
         }
 
-        _lockFee(feeValue, minTokensBought);
+        _lockFee(feeValue, minTokensBought, deadline);
 
         emit TakePerformanceFee(feeValue, tv);
         $lastTakeProfitTime = uint32(block.timestamp);
@@ -537,12 +546,16 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         IAdapter(adapter).recoverFunds(transfer, to);
     }
 
-    function _performSwap(uint sharesToSwap) internal returns (uint amountOut) {
+    function _performSwap(
+        uint sharesToSwap, 
+        uint256 minTokensBought, 
+        uint256 deadline
+    ) internal returns (uint amountOut) {
         transfer(address(SWAP_EXECUTOR), sharesToSwap);
-        return SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA));
+        return SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA), minTokensBought, deadline);
     }
 
-    function _lockFee(uint112 feeToLock, uint256 minTokensBought) internal {
+    function _lockFee(uint112 feeToLock, uint256 minTokensBought, uint256 deadline) internal {
         uint tv = totalValue();
         (uint nav, uint112 lockedFee) = _totalNAV(tv);
 
@@ -552,11 +565,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
             $valueDecayTarget -= lockedFee;
             _mint(address(this), shares);
 
-            uint tokenAmount = _performSwap(shares);
-            if (minTokensBought > tokenAmount) {
-                revert InsufficientLiquidityAdded(tokenAmount, minTokensBought);
-            }
-
+            uint tokenAmount = _performSwap(shares, minTokensBought, deadline);
             ABRA.safeTransfer($feeReceiver, tokenAmount);
         } else {
             if (minTokensBought > 0) {
@@ -574,20 +583,20 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     function _authorizeUpgrade(address) internal override onlyRole(UPGRADE_ROLE) {}
 
     function addSwapPoolAddress(address swapPool) external onlyRole(SWAP_POOL_ADDRESSES_ADMIN_ROLE) {
-        swapPoolAddresses.push(swapPool);
+        $swapPoolAddresses.push(swapPool);
         emit SwapPoolAddressAdded(swapPool);
     }
 
     function removeSwapPoolAddress(uint index) external onlyRole(SWAP_POOL_ADDRESSES_ADMIN_ROLE) {
-        uint _length = swapPoolAddresses.length;
+        uint _length = $swapPoolAddresses.length;
         if (index >= _length) {
             revert ArrayIndexOutOfBounds();
         }
-        address element = swapPoolAddresses[index];
+        address element = $swapPoolAddresses[index];
         if (index < _length - 1) {
-            swapPoolAddresses[index] = swapPoolAddresses[swapPoolAddresses.length - 1];
+            $swapPoolAddresses[index] = $swapPoolAddresses[$swapPoolAddresses.length - 1];
         }
-        swapPoolAddresses.pop();
+        $swapPoolAddresses.pop();
         emit SwapPoolAddressRemoved(element);
     }
 
@@ -595,24 +604,24 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
     ///@notice last time reward
     function lastTimeRewardApplicable() public view returns (uint256) {
-        return min(block.timestamp, rewardPeriodFinish);
+        return block.timestamp < $rewardPeriodFinish ? block.timestamp : $rewardPeriodFinish;
     }
 
     ///@notice  reward for a single token
     function rewardPerToken() public view returns (uint256 _rewardPerToken) {
-        _rewardPerToken = rewardPerTokenStored;
+        _rewardPerToken = $rewardPerTokenStored;
         uint256 _lastTimeRewardApplicable = lastTimeRewardApplicable();
-        if (_lastTimeRewardApplicable > rewardLastUpdateTime) {
+        if (_lastTimeRewardApplicable > $rewardLastUpdateTime) {
             uint256 _totalSupply = totalSupply();
             if (_totalSupply != 0) {
-                _rewardPerToken += (_lastTimeRewardApplicable - rewardLastUpdateTime) * rewardRate * 1e18 / _totalSupply;
+                _rewardPerToken += (_lastTimeRewardApplicable - $rewardLastUpdateTime) * $rewardRate * 1e18 / _totalSupply;
             }
         }
     }
 
     ///@notice see earned rewards for user
     function earned(address account) public view returns (uint256) {
-        return rewards[account] + balanceOf(account) * (rewardPerToken() - userRewardPerTokenPaid[account]) / 1e18;
+        return $rewards[account] + balanceOf(account) * (rewardPerToken() - $userRewardPerTokenPaid[account]) / 1e18;
     }
 
     ///@notice User harvest function
@@ -624,9 +633,9 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     }
     
     function getSwapPoolsReward() external returns (uint reward) {
-        uint l = swapPoolAddresses.length;
+        uint l = $swapPoolAddresses.length;
         for (uint i = 0; i < l; i++) {
-            reward += _getReward(swapPoolAddresses[i]);
+            reward += _getReward($swapPoolAddresses[i]);
         }
         if (reward > 0) {
             ABRA.safeTransfer($feeReceiver, reward);
@@ -637,18 +646,18 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         reward = earned(from);
         if (reward > 0) {
             updateRewardPerTokenStored();
-            userRewardPerTokenPaid[from] = rewardPerTokenStored;
-            rewards[from] = 0;
+            $userRewardPerTokenPaid[from] = $rewardPerTokenStored;
+            $rewards[from] = 0;
             emit Harvest(from, reward);
         }
     }
 
     function updateRewardPerTokenStored() private {
         uint256 _lastTimeRewardApplicable = lastTimeRewardApplicable();
-        if (_lastTimeRewardApplicable > rewardLastUpdateTime) {
+        if (_lastTimeRewardApplicable > $rewardLastUpdateTime) {
             // some reward should be in case _lastTimeRewardApplicable > rewardLastUpdateTime so no need to save gas checking rewardPerToken() differs from rewardPerTokenStored
-            rewardPerTokenStored = rewardPerToken();
-            rewardLastUpdateTime = uint32(_lastTimeRewardApplicable);
+            $rewardPerTokenStored = rewardPerToken();
+            $rewardLastUpdateTime = uint32(_lastTimeRewardApplicable);
         }
     }
 
@@ -656,12 +665,12 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         // always must be called only after updateRewardPerTokenStored
         if (account != address(0)) {
             uint256 _earned = earned(account);
-            if (_earned > rewards[account]) {
-                rewards[account] = _earned;
+            if (_earned > $rewards[account]) {
+                $rewards[account] = _earned;
             }
-            uint256 _rewardPerTokenStored = rewardPerTokenStored;
-            if (_rewardPerTokenStored > userRewardPerTokenPaid[account]) {
-                userRewardPerTokenPaid[account] = rewardPerTokenStored;
+            uint256 _rewardPerTokenStored = $rewardPerTokenStored;
+            if (_rewardPerTokenStored > $userRewardPerTokenPaid[account]) {
+                $userRewardPerTokenPaid[account] = $rewardPerTokenStored;
             }
         }
     }
@@ -669,7 +678,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     function _beforeTokenTransfer(
         address from,
         address to,
-        uint256 amount
+        uint256 /*amount*/
     ) internal override {
         updateRewardPerTokenStored();
         updateReward(from);
@@ -677,14 +686,16 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     }
 
     function _lockToken(uint reward) private {
+        // codesize optimization
+        uint _VALUE_DEGRADATION_DURATION = VALUE_DEGRADATION_DURATION;
         updateRewardPerTokenStored();
-        uint256 _rewardPeriodFinish = rewardPeriodFinish;
+        uint256 _rewardPeriodFinish = $rewardPeriodFinish;
         if (block.timestamp >= _rewardPeriodFinish) {
-            rewardRate = reward / VALUE_DEGRADATION_DURATION;
+            $rewardRate = reward / _VALUE_DEGRADATION_DURATION;
         } else {
             uint256 remaining = _rewardPeriodFinish - block.timestamp;
-            uint256 leftover = remaining * rewardRate;
-            rewardRate = (reward + leftover) / VALUE_DEGRADATION_DURATION;
+            uint256 leftover = remaining * $rewardRate;
+            $rewardRate = (reward + leftover) / _VALUE_DEGRADATION_DURATION;
         }
 
         // Ensure the provided reward amount is not more than the balance in the contract.
@@ -692,15 +703,10 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
         uint256 balance = ABRA.balanceOf(address(this));
-        require(rewardRate <= balance / VALUE_DEGRADATION_DURATION, "Provided reward too high");
+        require($rewardRate <= balance / _VALUE_DEGRADATION_DURATION, "Provided reward too high");
 
-        rewardLastUpdateTime = uint32(block.timestamp);
-        rewardPeriodFinish = uint32(block.timestamp + VALUE_DEGRADATION_DURATION);
-        emit RewardLocked(reward, block.timestamp + VALUE_DEGRADATION_DURATION);
+        $rewardLastUpdateTime = uint32(block.timestamp);
+        $rewardPeriodFinish = uint32(block.timestamp + _VALUE_DEGRADATION_DURATION);
+        emit RewardLocked(reward, block.timestamp + _VALUE_DEGRADATION_DURATION);
     }
-
-    function min(uint256 a, uint256 b) private pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
 }

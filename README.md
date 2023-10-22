@@ -16,19 +16,19 @@ balances while `Balancer` has 0 token balance.
 
 ## ENTERING STRATEGY
 Currently when entering a strategy, the user must specify which `Adapter` they want to deposit their assets to. 
-Our fronted will ensure that users deposit to the most profitable adapter, but we don't currently impose these on contract
-level.
+Our fronted will ensure that users deposit to the most profitable adapter, but we don't currently impose these restrictions
+on the contract level.
 
 ## LEAVING STRATEGY
 When leaving the strategy the user also specifies which `Adapter` will be use to withdraw assets from. Our frontend will
-specify the least profitable adapter, but as with invest above we don't expose any limitations on contract level.
+specify the least profitable adapter, but as with invest above we don't expose any limitations on the contract level.
 
 ## ORGANIC REBALANCE
 With the organic flow described above we hope that the strategy will always gravitate towards the most profitable protocol
 given it has constant flow of funds entering/leaving the strategy.
 
 ## MANUAL REBALANCE
-The most dangerous operation is manual rebalance. It's used when organic rebalance is not sufficient. 
+We also have manual reabalance. It's used when organic rebalance is not sufficient. 
 It involves dissolving LP tokens of one protocol, swapping these tokens into a combination of new tokens, and then 
 deposit of the new tokens to another protocols. We decided to support any arbitrary swap path via opaque callee and 
 calldata and in order to prevent rug pull we introduced two measures to protect the users:
@@ -48,3 +48,9 @@ we must call `activateAdapter` method.
 Any adapter can be removed without a timelock if it:
 1. Deactivated
 2. Has 0 liquidity.
+
+
+## TOKEN
+
+`Balancer` swaps all earned rewards and buys ABRA token which is then distributed to the participats.
+Tokens are bought back using Uniswap V3 pools.

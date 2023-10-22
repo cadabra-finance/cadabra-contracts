@@ -7,5 +7,5 @@ chainlink/=lib/chainlink
 prb-math/=lib/prb-math/src
 
 @layerzerolabs/solidity-examples=lib/solidity-examples/contracts
-@openzeppelin/contracts-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts

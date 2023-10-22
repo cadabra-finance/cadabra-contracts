@@ -49,7 +49,6 @@ interface IBalancer {
     error DeactivationFailed(address adapter);
     error InvalidPerformanceFee(uint performanceFee);
     error HugePerformanceFee(uint performanceFee, uint totalValue);
-    error InsufficientLiquidityAdded(uint has, uint wants);
     error Expired(uint deadline);
     error UpgradeAdaptersDontMatch(address sourceAdapter, address targetAdatper);
     error ArrayIndexOutOfBounds();
@@ -91,7 +90,7 @@ interface IBalancer {
     function deactivateAdapter(address adapterAddress) external;
     function upgradeAdapter(IAdapter sourceAdapter, IAdapter targetAdapter, uint32 deadline)  external;
     function setFeeReceiver(address feeReceiver_) external;
-    function takePerformanceFee(uint112 feeValue, uint256 minTokensBought) external;
+    function takePerformanceFee(uint112 feeValue, uint256 minTokensBought, uint32 deadline) external;
     function recoverFunds(address adapter, TransferInfo calldata transfer, address to) external;
     function addSwapPoolAddress(address swapPool) external;
     function removeSwapPoolAddress(uint index) external;

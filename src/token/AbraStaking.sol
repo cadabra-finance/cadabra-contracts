@@ -18,7 +18,7 @@ import {IRewardsSource} from "../interfaces/IRewardsSource.sol";
 /// distribution) goes up exponentially by the end of the staked period.
 contract AbraStaking is ERC20VotesUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
 
-    uint256 public constant MAX_STAKE_DURATION = 1461 days; // in seconds
+    uint256 private constant MAX_STAKE_DURATION = 1461 days; // in seconds
 
     // 1. Core Storage
     uint256 public immutable epoch; // timestamp
@@ -81,6 +81,10 @@ contract AbraStaking is ERC20VotesUpgradeable, OwnableUpgradeable, UUPSUpgradeab
         __ERC20Permit_init("veABRA");
         __ERC20_init("", "");
         __Ownable_init();
+    }
+
+    function maxStakeDuration() external pure returns (uint) {
+        return MAX_STAKE_DURATION;
     }
 
     function name() public pure override returns (string memory) {
@@ -183,17 +187,24 @@ contract AbraStaking is ERC20VotesUpgradeable, OwnableUpgradeable, UUPSUpgradeab
     /// @notice Collect staked ABRA for a lockup and any earned rewards.
     /// @param lockupId the id of the lockup to unstake
     function unstake(uint256 lockupId) external {
-        Lockup memory lockup = lockups[msg.sender][lockupId];
+        unstake(msg.sender, lockupId);
+    }
+
+    /// @notice Collect staked ABRA for a lockup and any earned rewards.
+    /// @param staker the address of the owner of the lockup
+    /// @param lockupId the id of the lockup to unstake
+    function unstake(address staker, uint256 lockupId) public {
+        Lockup memory lockup = lockups[staker][lockupId];
         uint256 amount = lockup.amount;
         uint256 end = lockup.end;
         uint256 points = lockup.points;
         require(block.timestamp >= end, "Staking: End of lockup not reached");
         require(end != 0, "Staking: Already unstaked this lockup");
-        _collectRewards(msg.sender);
-        delete lockups[msg.sender][lockupId]; // Keeps empty in array, so indexes are stable
-        _burn(msg.sender, points);
-        abra.transfer(msg.sender, amount);
-        emit Unstake(msg.sender, lockupId, amount, end, points);
+        _collectRewards(staker);
+        delete lockups[staker][lockupId]; // Keeps empty in array, so indexes are stable
+        _burn(staker, points);
+        abra.transfer(staker, amount);
+        emit Unstake(staker, lockupId, amount, end, points);
     }
 
     /// @notice Extend a stake lockup for additional points.

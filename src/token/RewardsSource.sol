@@ -7,6 +7,9 @@ interface IAbraStaking {
     function abra() external view returns (address);
 }
 
+/**
+ * @dev used by AbraStaking to distribute rewards among holders of ve-token.
+ */
 contract RewardsSource is IRewardsSource {
     IERC20 public immutable ABRA;
     address public immutable staking;
