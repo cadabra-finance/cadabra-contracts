@@ -11,7 +11,7 @@ contract VelodromePoolAdapter_qStablePair is VelodromePoolAdapter {
     uint public constant PRICE_BASE        = 1e18;
 
     IPool   public immutable QUOTE_POOL;
-    bool    public immutable IS_TOKEN1_QUOTE_IN_BASE_POOL;
+    bool    public immutable IS_TOKEN1_CONVERTIBLE_IN_BASE_POOL;
     bool    public immutable IS_TOKEN1_QUOTE_IN_QUOTE_POOL;
     bool    public immutable IS_BASE_POOL_STABLE;
     bool    public immutable IS_QUOTE_POOL_STABLE;
@@ -42,11 +42,11 @@ contract VelodromePoolAdapter_qStablePair is VelodromePoolAdapter {
         QUOTE_BASE = 10**quoteDecimals;
         QUOTE_PRICE_FACTOR = 10**(PRICE_DECIMALS - quoteDecimals);
 
-        IS_TOKEN1_QUOTE_IN_BASE_POOL = _isToken1Convertible(_convertibleToken);
+        IS_TOKEN1_CONVERTIBLE_IN_BASE_POOL = _isToken1ConvertibleInBasePool(_convertibleToken);
         IS_TOKEN1_QUOTE_IN_QUOTE_POOL = isToken1QuoteInQuotePool;
     }
 
-    function _isToken1Convertible(address _convertibleToken) private view returns (bool) {
+    function _isToken1ConvertibleInBasePool(address _convertibleToken) private view returns (bool) {
         if (address(TOKEN0) == _convertibleToken) {
             return false;
         } else if (address(TOKEN1) == _convertibleToken) {
@@ -74,34 +74,43 @@ contract VelodromePoolAdapter_qStablePair is VelodromePoolAdapter {
         uint price0;
         uint price1;
 
-        if (IS_TOKEN1_QUOTE_IN_BASE_POOL) {
-            // TOKEN0(POOL) -> TOKEN1(POOL)
-            price0 = VelodromeUtils.amount1(BASE0, BASE0, BASE1, r0, r1, IS_BASE_POOL_STABLE);
+        // BASE_POOL has (t0, t1) tokens, QUOTE_POOL has (qt0, qt1) tokens
+        if (IS_TOKEN1_CONVERTIBLE_IN_BASE_POOL) {
             if (IS_TOKEN1_QUOTE_IN_QUOTE_POOL) {
-                // TOKEN1(POOL) -> TOKEN1(QUOTE_POOL)
-                price0 = VelodromeUtils.amount1(price0, BASE0, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE) * QUOTE_PRICE_FACTOR;
-                price1 = VelodromeUtils.amount1(BASE1, BASE0, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE) * QUOTE_PRICE_FACTOR;
+                // t1 == qt0 - convertible token, qt1 - quote token
+                // price0 = convert{qt0 -> qt1}( convert{t0 -> t1}(base0) )
+                price0 = VelodromeUtils.amount1(BASE0, BASE0, BASE1, r0, r1, IS_BASE_POOL_STABLE);
+                price0 = VelodromeUtils.amount1(price0, BASE1, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE);
+                // price1 = convert{qt0 -> qt1}(base1)
+                price1 = VelodromeUtils.amount1(BASE1, BASE1, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE);
             } else {
-                // TOKEN1(POOL) -> TOKEN0(QUOTE_POOL)
-                price0 = VelodromeUtils.amount0(price0, BASE1, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE) * QUOTE_PRICE_FACTOR;
-                price1 = VelodromeUtils.amount0(BASE1, BASE1, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE) * QUOTE_PRICE_FACTOR;
+                // t1 == qt1 - convertible token, qt0 - quote token
+                // price0 = convert{qt1 -> qt0}( convert{t0 -> t1}(base0) )
+                price0 = VelodromeUtils.amount1(BASE0, BASE0, BASE1, r0, r1, IS_BASE_POOL_STABLE);
+                price0 = VelodromeUtils.amount0(price0, QUOTE_BASE, BASE1, qr0, qr1, IS_QUOTE_POOL_STABLE);
+                // price1 = convert{qt1 -> qt0}(base1)
+                price1 = VelodromeUtils.amount0(BASE1, QUOTE_BASE, BASE1, qr0, qr1, IS_QUOTE_POOL_STABLE);
             }
         } else {
-            // TOKEN1(POOL) -> TOKEN0(POOL)
-            price1 = VelodromeUtils.amount0(BASE1, BASE0, BASE1, r0, r1, IS_BASE_POOL_STABLE);
             if (IS_TOKEN1_QUOTE_IN_QUOTE_POOL) {
-                // TOKEN0(POOL) -> TOKEN1(QUOTE_POOL)
-                price0 = VelodromeUtils.amount1(BASE0, BASE0, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE) * QUOTE_PRICE_FACTOR;
-                price1 = VelodromeUtils.amount1(price1, BASE0, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE) * QUOTE_PRICE_FACTOR;
+                // t0 == qt0 - convertible token, qt1 - quote token
+                // price0 = convert{qt0 -> qt1}(base0)
+                price0 = VelodromeUtils.amount1(BASE0, BASE0, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE);
+                // price1 = convert{qt0 -> qt1}( convert{t1 -> t0}(base1) )
+                price1 = VelodromeUtils.amount0(BASE1, BASE0, BASE1, r0, r1, IS_BASE_POOL_STABLE);
+                price1 = VelodromeUtils.amount1(price1, BASE0, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE);
             } else {
-                // TOKEN0(POOL) -> TOKEN0(QUOTE_POOL)
-                price0 = VelodromeUtils.amount0(BASE1, BASE1, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE) * QUOTE_PRICE_FACTOR;
-                price1 = VelodromeUtils.amount0(price1, BASE1, QUOTE_BASE, qr0, qr1, IS_QUOTE_POOL_STABLE) * QUOTE_PRICE_FACTOR;
+                // t0 == qt1 - convertible token, qt0 - quote token
+                // price0 = convert{qt1 -> qt0}(base0)
+                price0 = VelodromeUtils.amount0(BASE1, QUOTE_BASE, BASE0, qr0, qr1, IS_QUOTE_POOL_STABLE);
+                // price1 = convert{qt1 -> qt0}( convert{t1 -> t0}(base1) )
+                price1 = VelodromeUtils.amount0(BASE1, BASE0, BASE1, r0, r1, IS_BASE_POOL_STABLE);
+                price1 = VelodromeUtils.amount0(price1, QUOTE_BASE, BASE0, qr0, qr1, IS_QUOTE_POOL_STABLE);
             }
         }
 
-        _value0 = _amount0 * price0 / BASE0;
-        _value1 = _amount1 * price1 / BASE1;
+        _value0 = _amount0 * price0 * QUOTE_PRICE_FACTOR / BASE0;
+        _value1 = _amount1 * price1 * QUOTE_PRICE_FACTOR / BASE1;
     }
 
 }
