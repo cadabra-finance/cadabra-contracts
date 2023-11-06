@@ -191,6 +191,7 @@ contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeab
             $rewards[msg.sender] = 0;
             emit Harvest(msg.sender, _reward);
             $abra.safeTransfer(msg.sender, _reward);
+            $lastAbraBalance -= _reward;
         }
     }
 
@@ -238,6 +239,7 @@ contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeab
 
         $claimable = 0;
         $claimed += _amountToClaim;
+        $lastAbraBalance -= _amountToClaim;
     }
 
     function previewClaim() external view returns (uint) {
