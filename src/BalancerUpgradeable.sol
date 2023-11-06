@@ -494,9 +494,9 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         }
 
         (uint sharesToMint, uint valuePrior, uint valueAdded) = _processCompound(adapter, swaps);
-        _mint(address(this), sharesToMint);
+        _mint(address(SWAP_EXECUTOR), sharesToMint);
 
-        tokensBought = _performSwap(sharesToMint, minTokensBought, deadline);
+        tokensBought = SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA), minTokensBought, deadline);
 
         uint fee = tokensBought * performanceFee / PERCENTAGE_COEFFICIENT;
         ABRA.safeTransfer($feeReceiver, fee);
@@ -546,15 +546,6 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         IAdapter(adapter).recoverFunds(transfer, to);
     }
 
-    function _performSwap(
-        uint sharesToSwap, 
-        uint256 minTokensBought, 
-        uint256 deadline
-    ) internal returns (uint amountOut) {
-        transfer(address(SWAP_EXECUTOR), sharesToSwap);
-        return SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA), minTokensBought, deadline);
-    }
-
     function _lockFee(uint112 feeToLock, uint256 minTokensBought, uint256 deadline) internal {
         uint tv = totalValue();
         (uint nav, uint112 lockedFee) = _totalNAV(tv);
@@ -563,9 +554,9 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         if (lockedFee > 0) {
             uint shares = _convertToShares(lockedFee, nav);
             $valueDecayTarget -= lockedFee;
-            _mint(address(this), shares);
+            _mint(address(SWAP_EXECUTOR), shares);
 
-            uint tokenAmount = _performSwap(shares, minTokensBought, deadline);
+            uint tokenAmount = SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA), minTokensBought, deadline);
             ABRA.safeTransfer($feeReceiver, tokenAmount);
         } else {
             if (minTokensBought > 0) {
