@@ -3,11 +3,13 @@ pragma solidity ^0.8.19;
 
 import "openzeppelin/token/ERC20/IERC20.sol";
 import "openzeppelin/utils/Address.sol";
+import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 import "../interfaces/IBalancer.sol";
 import "../interfaces/uniswap/IV3SwapRouter.sol";
 
 contract SwapExecutor {
+    using SafeERC20 for IERC20;
     IV3SwapRouter public immutable UNISWAP_ROUTER;
     uint24 public immutable UNISWAP_POOL_FEE;
 
@@ -19,7 +21,7 @@ contract SwapExecutor {
     function executeSwaps(IBalancer.SwapInfo[] calldata swaps) public {
         for (uint i = 0; i < swaps.length; i++) {
             IBalancer.SwapInfo calldata swap = swaps[i];
-            IERC20(swap.token).approve(swap.callee, swap.amount);
+            IERC20(swap.token).forceApprove(swap.callee, swap.amount);
             Address.functionCall(swap.callee, swap.data);
         }
     }
@@ -34,7 +36,7 @@ contract SwapExecutor {
         uint256 deadline
     ) external virtual returns (uint256 toAmount) {
         uint256 fromAmount = IERC20(fromToken).balanceOf(address(this));
-        IERC20(fromToken).approve(address(UNISWAP_ROUTER), fromAmount);
+        IERC20(fromToken).forceApprove(address(UNISWAP_ROUTER), fromAmount);
 
         toAmount = UNISWAP_ROUTER.exactInputSingle(
             IV3SwapRouter.ExactInputSingleParams(
