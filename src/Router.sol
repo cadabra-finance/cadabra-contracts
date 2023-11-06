@@ -89,7 +89,7 @@ contract Router is IRouter {
         uint256[] memory balancesBefore = new uint256[](minAmounts.length);
         for (uint i = 0; i < minAmounts.length; i++) {
             TokenAmount memory ta = minAmounts[i];
-            balancesBefore[i] = IERC20(ta.token).balanceOf(msg.sender);
+            balancesBefore[i] = IERC20(ta.token).balanceOf(receiver);
         }
         
         SafeERC20.safeTransferFrom(IERC20(balancer), msg.sender, address(this), shares);
@@ -97,7 +97,7 @@ contract Router is IRouter {
 
         for (uint i = 0; i < minAmounts.length; i++) {
             TokenAmount memory ta = minAmounts[i];
-            uint balanceAfter = IERC20(ta.token).balanceOf(msg.sender);
+            uint balanceAfter = IERC20(ta.token).balanceOf(receiver);
             uint diff = balanceAfter - balancesBefore[i];
             if (diff < ta.amount) {
                 revert InsufficientTokenRedeemed(ta.token, diff, ta.amount);
