@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Unlicensed
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 
 import "openzeppelin/token/ERC20/IERC20.sol";
@@ -10,32 +10,36 @@ import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 import "./BaseAdapter.sol";
 import "../interfaces/IAdapter.sol";
+import "../interfaces/thena/IGaugeV2.sol";
 import "../interfaces/IBalancer.sol";
-import "../interfaces/velodrome/IPool.sol";
-import "../interfaces/velodrome/IGauge.sol";
+import "../interfaces/thena/IPair.sol";
 
-abstract contract VelodromePoolAdapter is BaseAdapter {
+abstract contract ThenaPairAdapter is BaseAdapter {
 
     using SafeERC20 for IERC20;
 
-    IPool   public immutable POOL;
-    IGauge  public immutable GAUGE;
-    IERC20  public immutable TOKEN0;
-    IERC20  public immutable TOKEN1;
-    IERC20  public immutable REWARD_TOKEN;
+    IPair       public immutable PAIR;
+    IGaugeV2    public immutable GAUGE;
+    IERC20      public immutable TOKEN0;
+    IERC20      public immutable TOKEN1;
+    IERC20      public immutable REWARD_TOKEN;
 
-    constructor(address _balancer, address _gauge) BaseAdapter(_balancer) {
-        GAUGE = IGauge(_gauge);
-        POOL = IPool(GAUGE.stakingToken());
+    string private DESCRIPTION;
 
-        (address token0, address token1) = POOL.tokens();
+    constructor(address _balancer, address _gauge, string memory _description) BaseAdapter(_balancer) {
+        GAUGE = IGaugeV2(_gauge);
+        PAIR = IPair(GAUGE.TOKEN());
+
+        (address token0, address token1) = PAIR.tokens();
         TOKEN0 = IERC20(token0);
         TOKEN1 = IERC20(token1);
         REWARD_TOKEN = IERC20(GAUGE.rewardToken());
 
-        TOKEN0.approve(address(POOL), type(uint256).max);
-        TOKEN1.approve(address(POOL), type(uint256).max);
-        IERC20(address(POOL)).approve(address(GAUGE), type(uint256).max);
+        TOKEN0.approve(address(PAIR), type(uint256).max);
+        TOKEN1.approve(address(PAIR), type(uint256).max);
+        IERC20(address(PAIR)).approve(address(GAUGE), type(uint256).max);
+
+        DESCRIPTION = _description;
     }
 
     function _invest() internal override {
@@ -46,7 +50,7 @@ abstract contract VelodromePoolAdapter is BaseAdapter {
             // the tokens we have on our balance. We need to deposit them in accordance to the pair's ratio
             uint balance0 = TOKEN0.balanceOf(address(this));
             uint balance1 = TOKEN1.balanceOf(address(this));
-            (uint reserve0, uint reserve1,) = POOL.getReserves();
+            (uint reserve0, uint reserve1,) = PAIR.getReserves();
             if(reserve0 == 0 || reserve1 == 0){
                 revert ZeroReserveBalance(reserve0,reserve1);
             }
@@ -60,10 +64,10 @@ abstract contract VelodromePoolAdapter is BaseAdapter {
             }
         }
 
-        TOKEN0.safeTransfer(address(POOL), deposit0);
-        TOKEN1.safeTransfer(address(POOL), deposit1);
-        POOL.mint(address(this));
-        GAUGE.deposit(POOL.balanceOf(address(this)));
+        SafeERC20.safeTransfer(TOKEN0, address(PAIR), deposit0);
+        SafeERC20.safeTransfer(TOKEN1, address(PAIR), deposit1);
+        PAIR.mint(address(this));
+        GAUGE.depositAll();
     }
 
     function _redeem(uint lpAmount, address to)
@@ -72,8 +76,8 @@ abstract contract VelodromePoolAdapter is BaseAdapter {
         returns (address[] memory tokens, uint[] memory amounts)
     {
         GAUGE.withdraw(lpAmount);
-        POOL.transfer(address(POOL), lpAmount);
-        (uint amount0, uint amount1) = POOL.burn(to);
+        PAIR.transfer(address(PAIR), lpAmount);
+        (uint amount0, uint amount1) = PAIR.burn(to);
 
         tokens = depositTokens();
 
@@ -83,15 +87,15 @@ abstract contract VelodromePoolAdapter is BaseAdapter {
     }
 
     function _claimAll() internal override {
-        GAUGE.getReward(address(this));
+        GAUGE.getReward();
     }
 
     function value() public override view returns (uint _estimatedValue, uint _lps) {
-        (uint reserve0, uint reserve1,) = POOL.getReserves();
+        (uint reserve0, uint reserve1,) = PAIR.getReserves();
         (uint value0, uint value1) = _values(reserve0, reserve1);
 
         _lps = GAUGE.balanceOf(address(this));
-        _estimatedValue = (value0 + value1) * _lps / POOL.totalSupply();
+        _estimatedValue = (value0 + value1) * _lps / PAIR.totalSupply();
     }
 
     function negotiableTokens() public virtual override returns(address[] memory tokens) {
@@ -121,12 +125,12 @@ abstract contract VelodromePoolAdapter is BaseAdapter {
     function ratios() external override view returns (address[] memory tokens, uint[] memory ratio) {
         tokens = depositTokens();
         ratio = new uint[](2);
-        (ratio[0], ratio[1],) = POOL.getReserves();
+        (ratio[0], ratio[1], ) = PAIR.getReserves();
     }
 
     /// @dev for offchain use
-    function description() external view override returns (string memory) {
-        return string.concat('{"type":"velodromeGauge","vaultAddress": "', Strings.toHexString(address(GAUGE)), '"}');
+    function description() external override view returns (string memory) {
+        return DESCRIPTION;
     }
 
     function _values(uint256 _amount0, uint256 _amount1) internal view virtual returns (uint256 _value0, uint256 _value1);

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 
 import "./IAdapter.sol";
@@ -82,7 +82,7 @@ interface IBalancer {
         SwapInfo[] calldata swaps,
         uint256 minTokensBought, 
         uint32 deadline
-    ) external returns (uint tokensBought);
+    ) external returns (uint tokensBought, uint liquidityMinted);
 
     function addAdapter(address adapterAddress) external returns (bool);
     function removeAdapter(address adapterAddress) external returns (bool);

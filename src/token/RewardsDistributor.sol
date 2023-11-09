@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Unlicensed
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 import "@layerzerolabs/solidity-examples/token/oft/IOFT.sol";
 import "openzeppelin-upgradeable/access/AccessControlUpgradeable.sol";
@@ -11,10 +11,6 @@ interface ILayerZeroEndpoint {
     function getChainId() external view returns (uint16);
 }
 
-/**
- * @dev The purpose of this contract is to distribute ABRA token rewards between instances of RewardsSource in all
- * supported chains
- */
 contract RewardsDistributor is AccessControlUpgradeable, UUPSUpgradeable {
     uint public constant SEND_GAS = 190000;
     bytes public constant adapterParams = abi.encodePacked(uint16(1), SEND_GAS);

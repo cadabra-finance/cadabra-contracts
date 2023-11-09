@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Unlicensed
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 import {IRewardsSource} from "../interfaces/IRewardsSource.sol";
 import "openzeppelin/interfaces/IERC20.sol";
@@ -7,9 +7,6 @@ interface IAbraStaking {
     function abra() external view returns (address);
 }
 
-/**
- * @dev used by AbraStaking to distribute rewards among holders of ve-token.
- */
 contract RewardsSource is IRewardsSource {
     IERC20 public immutable ABRA;
     address public immutable staking;
@@ -29,7 +26,10 @@ contract RewardsSource is IRewardsSource {
     }
 
     function collectRewards() external onlyStaking() {
-        ABRA.transfer(staking, previewRewards());
+        uint reward = previewRewards();
+        if (reward > 0) {
+            ABRA.transfer(staking, reward);
+        }
     }
     
 }

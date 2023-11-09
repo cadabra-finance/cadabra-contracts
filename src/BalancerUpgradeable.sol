@@ -1,35 +1,19 @@
-// SPDX-License-Identifier: Unlicensed
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 
 import "openzeppelin-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "openzeppelin-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-import "openzeppelin-upgradeable/access/AccessControlUpgradeable.sol";
-import "openzeppelin-upgradeable/utils/math/SafeCastUpgradeable.sol";
-import "openzeppelin-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "openzeppelin-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "openzeppelin/token/ERC20/IERC20.sol";
+import "openzeppelin/utils/structs/EnumerableSet.sol";
+import "openzeppelin-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import "openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./interfaces/IAdapter.sol";
 import "./interfaces/IBalancer.sol";
 import "./helpers/SwapExecutor.sol";
 
-
-bytes32 constant TIMELOCK_ADMIN_ROLE = keccak256("TIMELOCK_ADMIN_ROLE"); // timelock
-bytes32 constant ADD_ADAPTER_ROLE = keccak256("ADD_ADAPTER_ROLE"); // timelock
-bytes32 constant REMOVE_ADAPTER_ROLE = keccak256("REMOVE_ADAPTER_ROLE"); // timelock
-bytes32 constant ACTIVATE_ADAPTER_ROLE = keccak256("ACTIVATE_ADAPTER_ROLE");
-bytes32 constant DEACTIVATE_ADAPTER_ROLE = keccak256("DEACTIVATE_ADAPTER_ROLE");
-bytes32 constant REBALANCE_ROLE = keccak256("REBALANCE_ROLE");
-bytes32 constant COMPOUND_ROLE = keccak256("COMPOUND_ROLE");
-bytes32 constant TAKE_PERFORMANCE_FEE_ROLE = keccak256("TAKE_PERFORMANCE_FEE_ROLE"); // timelock
-bytes32 constant UPGRADE_ROLE = keccak256("UPGRADE_ROLE"); // timelock
-bytes32 constant RECOVER_FUNDS_ROLE = keccak256("RECOVER_FUNDS_ROLE");
-bytes32 constant SWAP_POOL_ADDRESSES_ADMIN_ROLE = keccak256("SWAP_POOL_ADDRESSES_ADMIN_ROLE"); // timelock
-
-contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
-    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
+contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessManagedUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
     uint256 public constant PERCENTAGE_COEFFICIENT = 1e6; // 100%
@@ -49,8 +33,8 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     SwapExecutor private immutable SWAP_EXECUTOR;
     uint256 public immutable DEPOSIT_FEE;
     IERC20 public immutable ABRA;
-    EnumerableSetUpgradeable.AddressSet private $adapters;
-    EnumerableSetUpgradeable.AddressSet private $chargedAdapters;    
+    EnumerableSet.AddressSet private $adapters;
+    EnumerableSet.AddressSet private $chargedAdapters;
     mapping(address => bool) public $isActiveAdapter;
 
     /**
@@ -83,21 +67,11 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         DEPOSIT_FEE = _depositFee;
     }
 
-    function initialize(string memory name_, string memory symbol_, address feeReceiver_) public initializer {
+    function initialize(string memory name_, string memory symbol_, address feeReceiver_, address authority_) public initializer {
         __ERC20_init(name_, symbol_);
-        __AccessControl_init();
+        __AccessManaged_init(authority_);
         __ReentrancyGuard_init();
         $feeReceiver = feeReceiver_;
-        // codesize optimization
-        bytes32 _TIMELOCK_ADMIN_ROLE = TIMELOCK_ADMIN_ROLE;
-        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender()); // must be transferred to MULTISIG after deployment
-        _grantRole(_TIMELOCK_ADMIN_ROLE, _msgSender()); // must be transferred to TIMELOCK after deployment
-        
-        _setRoleAdmin(ADD_ADAPTER_ROLE, _TIMELOCK_ADMIN_ROLE); 
-        _setRoleAdmin(REMOVE_ADAPTER_ROLE, _TIMELOCK_ADMIN_ROLE); 
-        _setRoleAdmin(TAKE_PERFORMANCE_FEE_ROLE, _TIMELOCK_ADMIN_ROLE); 
-        _setRoleAdmin(UPGRADE_ROLE, _TIMELOCK_ADMIN_ROLE); 
-
         emit FeeReceiverChanged(address(0), feeReceiver_);
     }
 
@@ -322,12 +296,12 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
     //╔═══════════════════════════════════════════ ADMINISTRATIVE FUNCTIONS ═══════════════════════════════════════════╗
 
-    function setFeeReceiver(address feeReceiver_) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setFeeReceiver(address feeReceiver_) external override restricted {
         emit FeeReceiverChanged($feeReceiver, feeReceiver_);
         $feeReceiver = feeReceiver_;
     }
 
-    function addAdapter(address adapterAddress) external override onlyRole(ADD_ADAPTER_ROLE) returns (bool isAdded) {
+    function addAdapter(address adapterAddress) external override restricted returns (bool isAdded) {
         IAdapter adapter = IAdapter(adapterAddress);
         (uint v, uint a) = adapter.value();
         if (v != 0 || a != 0) {
@@ -339,7 +313,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         }
     }
 
-    function removeAdapter(address adapterAddress) external override onlyRole(REMOVE_ADAPTER_ROLE) returns (bool) {
+    function removeAdapter(address adapterAddress) external override restricted returns (bool) {
         if ($adapters.contains(adapterAddress)) {
             IAdapter adapter = IAdapter(adapterAddress);
             (uint v, uint a) = adapter.value();
@@ -353,7 +327,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         return false;
     }
 
-    function activateAdapter(address adapterAddress) external override onlyRole(ACTIVATE_ADAPTER_ROLE) returns (bool) {
+    function activateAdapter(address adapterAddress) external override restricted returns (bool) {
         uint l = $adapters.length();
 
         for (uint i=0; i < l; i++) {
@@ -367,7 +341,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         return false;
     }
 
-    function deactivateAdapter(address adapterAddress) external override onlyRole(DEACTIVATE_ADAPTER_ROLE) {
+    function deactivateAdapter(address adapterAddress) external override restricted {
         _deactivateAdapter(adapterAddress);
     }
 
@@ -384,7 +358,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         TransferInfo[] calldata transfers,
         uint minRebalancedValue,
         uint32 deadline
-    ) external override onlyRole(REBALANCE_ROLE) nonReentrant {
+    ) external override restricted nonReentrant {
         if (deadline < block.timestamp) {
             revert Expired(deadline);
         }
@@ -405,13 +379,13 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
         for (uint i = 0; i < swaps.length; i++) {
             IBalancer.SwapInfo calldata swap = swaps[i];
-            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(swap.token), address(SWAP_EXECUTOR), swap.amount);
+            SafeERC20.safeTransfer(IERC20(swap.token), address(SWAP_EXECUTOR), swap.amount);
         }
         SWAP_EXECUTOR.executeSwaps(swaps);
 
         for (uint i = 0; i < transfers.length; i++) {
             TransferInfo calldata transfer = transfers[i];
-            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(transfer.token), address(toAdapter), transfer.amount);
+            SafeERC20.safeTransfer(IERC20(transfer.token), address(toAdapter), transfer.amount);
         }
 
         (uint vb, uint va) = toAdapter.invest(address(this));
@@ -437,7 +411,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         IAdapter sourceAdapter,
         IAdapter targetAdapter,        
         uint32   deadline
-    )  external override onlyRole(REBALANCE_ROLE) nonReentrant {
+    )  external override restricted nonReentrant {
         if (deadline < block.timestamp) {
             revert Expired(deadline);
         }        
@@ -482,7 +456,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         SwapInfo[] calldata swaps, 
         uint256 minTokensBought,
         uint32 deadline
-    ) external override onlyRole(COMPOUND_ROLE) nonReentrant returns (uint tokensBought) {
+    ) external override restricted nonReentrant returns (uint tokensBought, uint liquidityMinted) {
         if (deadline < block.timestamp) {
             revert Expired(deadline);
         }
@@ -495,8 +469,9 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
 
         (uint sharesToMint, uint valuePrior, uint valueAdded) = _processCompound(adapter, swaps);
         _mint(address(SWAP_EXECUTOR), sharesToMint);
+        liquidityMinted = sharesToMint;
 
-        tokensBought = SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA), minTokensBought, deadline);
+        tokensBought = SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA), minTokensBought);
 
         uint fee = tokensBought * performanceFee / PERCENTAGE_COEFFICIENT;
         ABRA.safeTransfer($feeReceiver, fee);
@@ -512,9 +487,12 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
     ) 
         external 
         override 
-        onlyRole(TAKE_PERFORMANCE_FEE_ROLE) 
+        restricted
         nonReentrant 
     {
+        if (deadline < block.timestamp) {
+            revert Expired(deadline);
+        }
         if ($lastTakeProfitTime + TAKE_PROFIT_COOLDOWN > block.timestamp) {
             revert Cooldown($lastTakeProfitTime + TAKE_PROFIT_COOLDOWN);
         }
@@ -527,7 +505,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
             revert HugePerformanceFee(feeValue, tv);
         }
 
-        _lockFee(feeValue, minTokensBought, deadline);
+        _lockFee(feeValue, minTokensBought);
 
         emit TakePerformanceFee(feeValue, tv);
         $lastTakeProfitTime = uint32(block.timestamp);
@@ -541,12 +519,12 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         external 
         virtual 
         override 
-        onlyRole(RECOVER_FUNDS_ROLE)
+        restricted
     {
         IAdapter(adapter).recoverFunds(transfer, to);
     }
 
-    function _lockFee(uint112 feeToLock, uint256 minTokensBought, uint256 deadline) internal {
+    function _lockFee(uint112 feeToLock, uint256 minTokensBought) internal {
         uint tv = totalValue();
         (uint nav, uint112 lockedFee) = _totalNAV(tv);
 
@@ -556,7 +534,7 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
             $valueDecayTarget -= lockedFee;
             _mint(address(SWAP_EXECUTOR), shares);
 
-            uint tokenAmount = SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA), minTokensBought, deadline);
+            uint tokenAmount = SWAP_EXECUTOR.defaultSwap(address(this), address(ABRA), minTokensBought);
             ABRA.safeTransfer($feeReceiver, tokenAmount);
         } else {
             if (minTokensBought > 0) {
@@ -571,14 +549,14 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         emit FeeLocked(tv, feeToLock, block.timestamp + VALUE_DEGRADATION_DURATION);
     }
 
-    function _authorizeUpgrade(address) internal override onlyRole(UPGRADE_ROLE) {}
+    function _authorizeUpgrade(address) internal override restricted {}
 
-    function addSwapPoolAddress(address swapPool) external onlyRole(SWAP_POOL_ADDRESSES_ADMIN_ROLE) {
+    function addSwapPoolAddress(address swapPool) external restricted {
         $swapPoolAddresses.push(swapPool);
         emit SwapPoolAddressAdded(swapPool);
     }
 
-    function removeSwapPoolAddress(uint index) external onlyRole(SWAP_POOL_ADDRESSES_ADMIN_ROLE) {
+    function removeSwapPoolAddress(uint index) external restricted {
         uint _length = $swapPoolAddresses.length;
         if (index >= _length) {
             revert ArrayIndexOutOfBounds();
@@ -666,14 +644,11 @@ contract BalancerUpgradeable is IBalancer, ERC20Upgradeable, AccessControlUpgrad
         }
     }
 
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 /*amount*/
-    ) internal override {
+    function _update(address from, address to, uint256 value) internal virtual override {
         updateRewardPerTokenStored();
         updateReward(from);
         updateReward(to);
+        super._update(from, to, value);
     }
 
     function _lockToken(uint reward) private {
