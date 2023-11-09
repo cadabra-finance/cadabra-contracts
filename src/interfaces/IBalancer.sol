@@ -82,7 +82,7 @@ interface IBalancer {
         SwapInfo[] calldata swaps,
         uint256 minTokensBought, 
         uint32 deadline
-    ) external returns (uint tokensBought);
+    ) external returns (uint tokensBought, uint liquidityMinted);
 
     function addAdapter(address adapterAddress) external returns (bool);
     function removeAdapter(address adapterAddress) external returns (bool);

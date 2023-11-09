@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 import {OwnableUpgradeable} from "openzeppelin-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC20VotesUpgradeable} from "openzeppelin-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
-import {ERC20PermitUpgradeable} from "openzeppelin-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import {ERC20PermitUpgradeable} from "openzeppelin-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import {ERC20Upgradeable} from "openzeppelin-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {ERC20} from "openzeppelin/token/ERC20/ERC20.sol";
 import {UUPSUpgradeable} from "openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -18,14 +18,13 @@ import {IRewardsSource} from "../interfaces/IRewardsSource.sol";
 /// distribution) goes up exponentially by the end of the staked period.
 contract AbraStaking is ERC20VotesUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
 
-    uint256 private constant MAX_STAKE_DURATION = 1461 days; // in seconds
-
     // 1. Core Storage
     uint256 public immutable epoch; // timestamp
     uint256 public immutable minStakeDuration; // in seconds
+    uint256 public immutable maxStakeDuration; // in seconds
 
     // 2. Staking and Lockup Storage
-    uint256 constant YEAR_BASE = 18e17;
+    uint256 constant YEAR_BASE = 12e17;
     struct Lockup {
         uint128 amount;
         uint128 end;
@@ -69,22 +68,19 @@ contract AbraStaking is ERC20VotesUpgradeable, OwnableUpgradeable, UUPSUpgradeab
         address _abra,
         uint256 _epoch,
         uint256 _minStakeDuration,
+        uint256 _maxStakeDuration,
         address _rewardsSource
     ) {
         abra = ERC20(_abra);
         epoch = _epoch;
         minStakeDuration = _minStakeDuration;
+        maxStakeDuration = _maxStakeDuration;
         rewardsSource = IRewardsSource(_rewardsSource);
     }
 
     function initialize() external initializer {
-        __ERC20Permit_init("veABRA");
         __ERC20_init("", "");
-        __Ownable_init();
-    }
-
-    function maxStakeDuration() external pure returns (uint) {
-        return MAX_STAKE_DURATION;
+        __Ownable_init(msg.sender);
     }
 
     function name() public pure override returns (string memory) {
@@ -221,6 +217,9 @@ contract AbraStaking is ERC20VotesUpgradeable, OwnableUpgradeable, UUPSUpgradeab
     /// @param lockupId the id of the old lockup to extend
     /// @param duration number of seconds from now to stake for
     function extend(uint256 lockupId, uint256 duration) external {
+        if (true) { // remove compilation warnings
+            revert("Extend is not fully supported yet.");
+        }
         // duration checked inside previewPoints
         _collectRewards(msg.sender);
         Lockup memory lockup = lockups[msg.sender][lockupId];
@@ -257,12 +256,16 @@ contract AbraStaking is ERC20VotesUpgradeable, OwnableUpgradeable, UUPSUpgradeab
     returns (uint256, uint256)
     {
         require(duration >= minStakeDuration, "Staking: Too short");
-        require(duration <= MAX_STAKE_DURATION, "Staking: Too long");
+        require(duration <= maxStakeDuration, "Staking: Too long");
         uint256 start = block.timestamp > epoch ? block.timestamp : epoch;
         uint256 end = start + duration;
         uint256 endYearpoc = ((end - epoch) * 1e18) / 365 days;
         uint256 multiplier = ud(YEAR_BASE).pow(ud(endYearpoc)).unwrap();
         return ((amount * multiplier) / 1e18, end);
+    }
+
+    function lockupsLength(address staker) external view returns (uint) {
+        return lockups[staker].length;
     }
 
     // 3. Reward functions

@@ -26,14 +26,10 @@ contract SwapExecutor {
         }
     }
 
-    /**
-     * @dev this method is meant to be used to make swaps between ABRA and strategy tokens
-     */
     function defaultSwap(
         address fromToken,
         address toToken,
-        uint256 amountOutMinimum,
-        uint256 deadline
+        uint256 amountOutMinimum
     ) external virtual returns (uint256 toAmount) {
         uint256 fromAmount = IERC20(fromToken).balanceOf(address(this));
         IERC20(fromToken).forceApprove(address(UNISWAP_ROUTER), fromAmount);
@@ -44,7 +40,6 @@ contract SwapExecutor {
                 toToken,
                 UNISWAP_POOL_FEE,
                 msg.sender,
-                deadline,
                 fromAmount,
                 amountOutMinimum,
                 0

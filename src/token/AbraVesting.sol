@@ -3,21 +3,12 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import "openzeppelin/token/ERC20/IERC20.sol";
 import "openzeppelin-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "openzeppelin-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import "openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 import "./AbraStaking.sol";
 
-/**
- * @dev The purpose of this contract is to allow for a linear vesting schedule through locking tokens. 
- * A specified amount of tokens will be divided into portions that are locked such that the lock duration increases 
- * incrementally with each lock until the final portion is locked for the maximum lock duration.
- * 
- * The vesting contract is tokenized, meaning that future unlocks can be shared between multiple participants.
- * 
- * All voting rights are delegated to the contract owner.
- */
 contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeable {
 
     using SafeERC20 for IERC20;
@@ -60,7 +51,7 @@ contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeab
             uint32 _lockPeriodDuration,
             uint256 _lockPeriodCount) public initializer {
         __ERC20_init(name_, symbol_);
-        __Ownable2Step_init();
+        __Ownable_init(msg.sender);
         
         $abraStaking = AbraStaking(_abraStaking);
         $abra = ERC20($abraStaking.abra());
@@ -166,14 +157,6 @@ contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeab
         }
     }
 
-    /**
-     * @dev The new owner accepts the ownership transfer.
-     */
-    function acceptOwnership() public override {
-        Ownable2StepUpgradeable.acceptOwnership();
-        $abraStaking.delegate(msg.sender);
-    }
-
     //╔═══════════════════════════════════════════ DISTRIBUTION ═══════════════════════════════════════════╗
 
     ///@notice see earned rewards for user
@@ -208,14 +191,11 @@ contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeab
         }
     }
 
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal override {
+    function _update(address from, address to, uint256 value) internal virtual override {
         unlockTokens();
         updateReward(from);
         updateReward(to);
+        super._update(from, to, value);
     }
 
     function _distribute(uint reward) private {
@@ -253,5 +233,13 @@ contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeab
     //╔═══════════════════════════════════════════ ADMIN ═══════════════════════════════════════════╗
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /**
+     * @dev The new owner accepts the ownership transfer.
+     */
+    function acceptOwnership() public override {
+        Ownable2StepUpgradeable.acceptOwnership();
+        $abraStaking.delegate(msg.sender);
+    }
 
 }

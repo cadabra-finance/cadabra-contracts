@@ -11,10 +11,6 @@ interface ILayerZeroEndpoint {
     function getChainId() external view returns (uint16);
 }
 
-/**
- * @dev The purpose of this contract is to distribute ABRA token rewards between instances of RewardsSource in all
- * supported chains
- */
 contract RewardsDistributor is AccessControlUpgradeable, UUPSUpgradeable {
     uint public constant SEND_GAS = 190000;
     bytes public constant adapterParams = abi.encodePacked(uint16(1), SEND_GAS);

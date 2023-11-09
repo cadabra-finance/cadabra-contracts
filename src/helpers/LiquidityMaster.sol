@@ -1,26 +1,15 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Unlicensed
 
 pragma solidity ^0.8.19;
 
 import "openzeppelin-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
+import "openzeppelin-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 
-import "./interfaces/uniswap/INonfungiblePositionManager.sol";
-import "./token/Abra.sol";
+import "./../interfaces/uniswap/INonfungiblePositionManager.sol";
+import "./../token/Abra.sol";
+import "./../interfaces/IBalancer.sol";
 
-/**
- * @dev LiquidityMaster controls the protocol-owned liquidity. It can add ranges at V3 pools and change single sided
- * ABRA liquidity at any pool. It can't change the liquidity of the range if the current price is within that range.
- * 
- * The goal of this contract is to keep ability to change ABRA allocations beetween pools, for example to rebalance 
- * the supply of ABRA between pools, or to a new pool. At the same time it ensures that underlying luqidity of the 
- * second token can't be withdrawn by the protocol.
- */
-contract LiquidityMaster is AccessControlUpgradeable, UUPSUpgradeable {
-
-    bytes32 public constant UPGRADE_ROLE = keccak256("UPGRADE_ROLE"); // timelock
-    bytes32 public constant CONSTRAINT_MANAGER_ROLE = keccak256("CONSTRAINT_MANAGER_ROLE"); // timelock
-    bytes32 public constant POSITION_MANAGER_ROLE = keccak256("POSITION_MANAGER_ROLE");
+contract LiquidityMaster is AccessManagedUpgradeable, UUPSUpgradeable {
 
     struct MintParams {
         address token;
@@ -50,23 +39,22 @@ contract LiquidityMaster is AccessControlUpgradeable, UUPSUpgradeable {
         abra = Abra(_abra);
     }
 
-    function initialize() external initializer {
-        __AccessControl_init();
+    function initialize(address _authority) external initializer {
+        __AccessManaged_init(_authority);
         __UUPSUpgradeable_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
-    function permitAsset(address asset, bool permit) external onlyRole (CONSTRAINT_MANAGER_ROLE) {
+    function permitAsset(address asset, bool permit) external restricted {
         permittedAssets[asset] = permit;
     }
 
-    function setRecipientForChain(uint16 _dstChainId, address _recipient) external onlyRole (CONSTRAINT_MANAGER_ROLE) {
+    function setRecipientForChain(uint16 _dstChainId, address _recipient) external restricted {
         recipientByChainId[_dstChainId] = _recipient;
     }
 
     function mintLiquidity(MintParams calldata params)
-        external
-        onlyRole(POSITION_MANAGER_ROLE)
+        public
+        restricted
         returns (
             uint256 tokenId,
             uint128 liquidity,
@@ -101,7 +89,7 @@ contract LiquidityMaster is AccessControlUpgradeable, UUPSUpgradeable {
 
     function increaseLiquidity(IncreaseLiquidityParams calldata params)
         external
-        onlyRole(POSITION_MANAGER_ROLE)
+        restricted
         returns (
             uint128 liquidity,
             uint256 amount0,
@@ -110,6 +98,7 @@ contract LiquidityMaster is AccessControlUpgradeable, UUPSUpgradeable {
     {
         (,,address token0, address token1,,,,,,,,) = nonfungiblePositionManager.positions(params.tokenId);
 
+        require(token0 == address(abra) || token1 == address(abra), "LM: ABRA_TOKEN_REQUIRED");
         _checkAssetPermitted(token0 == address(abra) ? token1 : token0);
 
         (uint256 increaseAmount0, uint256 increaseAmount1) = token1 == address(abra)
@@ -129,26 +118,42 @@ contract LiquidityMaster is AccessControlUpgradeable, UUPSUpgradeable {
     }
 
     function decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams calldata params)
-        external
-        onlyRole(POSITION_MANAGER_ROLE)
+        public
+        restricted
         returns (uint256 amount0, uint256 amount1)
     {
         (,,address token0, address token1,,,,,,,,) = nonfungiblePositionManager.positions(params.tokenId);
+        require(token0 == address(abra) || token1 == address(abra), "LM: ABRA_TOKEN_REQUIRED");
 
         (amount0, amount1) = nonfungiblePositionManager.decreaseLiquidity(params);
         require(token0 == address(abra) ? amount1 == 0 : amount0 == 0, "LM: can not decrease liquidity");
     }
 
-    function sendAbraToChain(uint16 _dstChainId, uint256 amount) payable external onlyRole(POSITION_MANAGER_ROLE) {
+    function sendAbraToChain(uint16 _dstChainId, uint256 amount) payable external restricted {
         address target = recipientByChainId[_dstChainId];
         require(target != address(0), "LM: no recipient for target chain");
         abra.sendFrom{value: msg.value}(address(this), _dstChainId, abi.encodePacked(target), amount, payable(msg.sender), msg.sender, "");
     }
 
-    function _authorizeUpgrade(address) internal override onlyRole(UPGRADE_ROLE) {}
+    function _authorizeUpgrade(address) internal override restricted {}
 
     function _checkAssetPermitted(address token) private view {
         require(permittedAssets[token], "LM: asset not permitted");
+    }
+
+    function compound(
+        INonfungiblePositionManager.DecreaseLiquidityParams calldata decreaseLiquidityParams,
+        MintParams calldata mintParams,
+        IBalancer balancer,
+        address adapter,
+        uint performanceFee,
+        IBalancer.SwapInfo[] calldata swaps,
+        uint256 minTokensBought,
+        uint32 deadline
+    ) external restricted returns (uint tokensBought, uint liquidityMinted) {
+        decreaseLiquidity(decreaseLiquidityParams);
+        mintLiquidity(mintParams);
+        return balancer.compound(adapter, performanceFee, swaps, minTokensBought, deadline);
     }
 
 }
