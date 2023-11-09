@@ -18,7 +18,7 @@
 	url = https://github.com/uniswap/v3-core
 [submodule "lib/solidity-examples"]
 	path = lib/solidity-examples
-	url = https://github.com/LayerZero-Labs/solidity-examples
+	url = git@github.com:cadabra-finance/solidity-examples.git
 [submodule "lib/prb-math"]
 	path = lib/prb-math
 	url = https://github.com/PaulRBerg/prb-math
