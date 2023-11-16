@@ -204,8 +204,8 @@ abstract contract ReferralRewards {
         if (duration < 91 days) return (30 days, 91 days, 154000, 196000);
         if (duration < 182 days) return (91 days, 182 days, 196000, 238000);
         if (duration < 365 days) return (182 days, 365 days, 238000, 322000);
-        if (duration < 730 days) return (365 days, 730 days, 322000, 250000);
-        return (730 days, duration, 250000, 250000);
+        if (duration < 730 days) return (365 days, 730 days, 322000, 230000);
+        return (730 days, duration, 230000, 230000);
     }
 
     function getRewardParameters2(
@@ -220,8 +220,8 @@ abstract contract ReferralRewards {
         if (duration < 91 days) return (30 days, 91 days, 132000, 168000);
         if (duration < 182 days) return (91 days, 182 days, 168000, 204000);
         if (duration < 365 days) return (182 days, 365 days, 204000, 276000);
-        if (duration < 730 days) return (365 days, 730 days, 276000, 250000);
-        return (730 days, duration, 250000, 250000);
+        if (duration < 730 days) return (365 days, 730 days, 276000, 230000);
+        return (730 days, duration, 230000, 230000);
     }
 
     function getRewardParameters3(
