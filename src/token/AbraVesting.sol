@@ -85,8 +85,10 @@ contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeab
         require($isVestingStarted == false, "Already vesting");
         $isVestingStarted = true;
 
-        uint _totalAmount = $totalLocked;
         AbraStaking _abraStaking = $abraStaking;
+        require(_abraStaking.lockupsLength(address(this)) == 0, "Lockups not empty");
+
+        uint _totalAmount = $totalLocked;
         IERC20 _abra = $abra;
         _abra.safeTransferFrom(msg.sender, address(this), _totalAmount);
         _abra.approve(address(_abraStaking), _totalAmount);
@@ -239,7 +241,7 @@ contract AbraVesting is Ownable2StepUpgradeable, ERC20Upgradeable, UUPSUpgradeab
 
         $claimable = 0;
         $claimed += _amountToClaim;
-        $lastAbraBalance -= _amountToClaim;
+        $lastAbraBalance -= _amountToClaim - _rewards;
     }
 
     function previewClaim() external view returns (uint) {
