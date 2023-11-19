@@ -8,6 +8,8 @@ import "./StableUtils.sol";
 
 library VelodromeUtils {
 
+    uint constant MIN_ORACLE_WINDOW = 15 minutes;
+
     error UnsupportedToken(address token);
 
     function amountOut(address _pool, address _tokenIn, uint256 _amountIn)
@@ -69,8 +71,17 @@ library VelodromeUtils {
         IPool pool = IPool(_pool);
         IPool.Observation memory _observation = pool.lastObservation();
         (uint256 reserve0Cumulative, uint256 reserve1Cumulative,) = pool.currentCumulativePrices();
-        if (block.timestamp == _observation.timestamp) {
-            _observation = pool.observations(pool.observationLength() - 2);
+
+        uint minOracleTimestamp = block.timestamp - MIN_ORACLE_WINDOW;
+
+        if (_observation.timestamp > minOracleTimestamp) {
+            uint observationLength = pool.observationLength();
+            for (uint i = observationLength - 1; i > 0; --i) {
+                _observation = pool.observations(i-1);
+                if (_observation.timestamp <= minOracleTimestamp) {
+                    break;
+                }
+            }
         }
 
         uint256 timeElapsed = block.timestamp - _observation.timestamp;
